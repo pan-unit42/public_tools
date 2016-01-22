@@ -38,7 +38,7 @@ def find_string_occurrences(string):
 def find_embedded_exes():
 	results = []
 	exes = find_string_occurrences("!This program cannot be run in DOS mode.")
-	if len(exes) > 1:
+	if len(exes) > 0:
 		for exe in exes:
 			m = Byte(exe-77)
 			z = Byte(exe-76)
