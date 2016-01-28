@@ -1,0 +1,31 @@
+<MaltegoEntity id="maltego.IPv4Address" displayName="IPv4 Address" displayNamePlural="IPv4 Adresses" description="An IP version 4 address" category="Infrastructure" smallIconResource="NetCardGolden" largeIconResource="NetCardGolden" allowedRoot="true" conversionOrder="60" visible="true">
+   <Converter>
+      <Value><![CDATA[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)]]></Value>
+   </Converter>
+   <Properties value="ipv4-address">
+      <Groups/>
+      <Fields>
+         <Field name="ipv4-address" type="string" nullable="true" hidden="false" readonly="false" displayName="IP Address">
+            <SampleValue>74.207.243.85</SampleValue>
+         </Field>
+         <Field name="ipaddress.internal" type="boolean" nullable="true" hidden="false" readonly="false" displayName="Internal">
+            <SampleValue>false</SampleValue>
+         </Field>
+         <Field name="owner" type="string[]" nullable="true" hidden="false" readonly="false">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="Before" type="string[]" nullable="true" hidden="false" readonly="false">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="After" type="string[]" nullable="true" hidden="false" readonly="false">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="includeMediaType" type="string" nullable="true" hidden="false" readonly="false" displayName="Include Media Type">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="excludeMediaType" type="string" nullable="true" hidden="false" readonly="false" displayName="Exclude Media Type">
+            <SampleValue></SampleValue>
+         </Field>
+      </Fields>
+   </Properties>
+</MaltegoEntity>

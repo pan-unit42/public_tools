@@ -1,0 +1,31 @@
+<MaltegoEntity id="maltego.Domain" displayName="Domain" displayNamePlural="Domains" description="An internet domain" category="Infrastructure" smallIconResource="Domain" largeIconResource="Domain" allowedRoot="true" conversionOrder="120" visible="true">
+   <Converter>
+      <Value><![CDATA[[-\w]{1,120}\.[-\w]{1,4}\.*[-\w]{0,4}]]></Value>
+   </Converter>
+   <Properties value="fqdn">
+      <Groups/>
+      <Fields>
+         <Field name="fqdn" type="string" nullable="true" hidden="false" readonly="false" displayName="Domain Name">
+            <SampleValue>paterva.com</SampleValue>
+         </Field>
+         <Field name="whois-info" type="string" nullable="true" hidden="false" readonly="false" displayName="WHOIS Info">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="owner" type="string[]" nullable="true" hidden="false" readonly="false">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="Before" type="string[]" nullable="true" hidden="false" readonly="false">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="After" type="string[]" nullable="true" hidden="false" readonly="false">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="includeMediaType" type="string" nullable="true" hidden="false" readonly="false" displayName="Include Media Type">
+            <SampleValue></SampleValue>
+         </Field>
+         <Field name="excludeMediaType" type="string" nullable="true" hidden="false" readonly="false" displayName="Exclude Media Type">
+            <SampleValue></SampleValue>
+         </Field>
+      </Fields>
+   </Properties>
+</MaltegoEntity>
