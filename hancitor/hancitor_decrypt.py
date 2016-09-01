@@ -5,8 +5,8 @@ import re, struct, sys, base64
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.0"
-__date__    = "24AUG2016"
+__version__ = "1.0.1"
+__date__    = "01SEP2016"
 
 # Setup Unicorn enviroment
 ADDRESS = 0x1000000
@@ -16,6 +16,8 @@ mu.mem_map(ADDRESS, 4 * 1024 * 1024)
 ###############
 # First Phase #
 ###############
+
+print "[+] FILE: %s\n\t#### PHASE 1 ####" % sys.argv[1]
 
 # Open Word Document and copy data
 FILE_HANDLE = open(sys.argv[1], "r")
@@ -34,10 +36,29 @@ except:
     print "[!] Unable to process %s" % sys.argv[1]
     sys.exit(1)
 
-# Locate variables
-ADD_VALUE  = SC_DATA[2966]
-XOR_VALUE  = SC_DATA[2968]
-SIZE_VALUE = SC_DATA[2975:2979]
+# Extract data depending on version of dropper variables
+if SC_DATA != None:
+    print "\t[-] Found B64 shellcode"
+    # Pull from shellcode
+    ADD_VALUE  = SC_DATA[2966]
+    XOR_VALUE  = SC_DATA[2968]
+    SIZE_VALUE = SC_DATA[2975:2979]
+    # Extract payload base on shellcode data
+    MAGIC_OFFSET = re.search("\x50\x4F\x4C\x41", FILE_CONTENT)
+    MAGIC_OFFSET = MAGIC_OFFSET.start()
+    SIZE_VALUE = struct.unpack("<L", SIZE_VALUE)[0]
+    ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + SIZE_VALUE]
+else:
+    print "\t[!] No raw B64 shellcode, going blind"
+    # Extract payload blind without shellcode
+    MAGIC_OFFSET = re.findall("\x50\x4F\x4C\x41.*\x4F\x4F\x4F\x4F\x00\x00\x00\x00", FILE_CONTENT)
+    SIZE_VALUE = len(MAGIC_OFFSET[0]) - 4
+    ENC_PAYLOAD = MAGIC_OFFSET[0][0:SIZE_VALUE]
+    # Phase1 most common variables
+    ADD_VALUE  = "\x03"
+    XOR_VALUE  = "\x13"
+
+SIZE_VALUE = struct.pack("i", SIZE_VALUE)
 
 # Build shellcode with variables
 # sub_8A6
@@ -51,11 +72,7 @@ SC += b'\x8D\x48\xBF\x80\xF9\x19\x77\x07\x0F\xBE\xC0\x83\xE8\x41\xC3\x8D\x48\x9F
 # sub_827
 SC += b'\x55\x8B\xEC\x51\x51\x8B\x45\x08\x83\x65\xFC\x00\x89\x45\xF8\x8A\x00\x84\xC0\x74\x68\x53\x56\x57\xE8\xA3\xFF\xFF\xFF\x8B\xD8\x8B\x45\xFC\xE8\x7C\xFF\xFF\xFF\x8B\x4D\xF8\x8D\x14\x08\x8B\x45\xFC\xE8\x7B\xFF\xFF\xFF\x8B\xF8\x8B\xF0\xF7\xDE\x8D\x4E\x08\xB0\x01\xD2\xE0\xFE\xC8\xF6\xD0\x20\x02\x83\xFF\x03\x7D\x09\x8D\x4E\x02\xD2\xE3\x08\x1A\xEB\x15\x8D\x4F\xFE\x8B\xC3\xD3\xF8\x8D\x4E\x0A\xD2\xE3\x08\x02\xC6\x42\x01\x00\x08\x5A\x01\xFF\x45\x08\x8B\x45\x08\x8A\x00\xFF\x45\xFC\x84\xC0\x75\x9E\x5F\x5E\x5B\xC9\xC3'
 
-# Extract payload
-MAGIC_OFFSET = re.search("\x50\x4F\x4C\x41", FILE_CONTENT)
-MAGIC_OFFSET = MAGIC_OFFSET.start()
-SIZE_VALUE = struct.unpack("<L", SIZE_VALUE)[0]
-ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + SIZE_VALUE]
+SIZE_VALUE = struct.unpack("i", SIZE_VALUE)[0]
 
 # Build final code to emulate
 X86_CODE32 = SC + ENC_PAYLOAD
@@ -82,7 +99,7 @@ except UcError as e:
 #print "Decrypt: %s" % mu.mem_read(0x10000F9,150)
 
 # Print results
-print "[+] FILE: %s\n\t#### PHASE 1 ####\n\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (sys.argv[1], hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
+print "\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
 if mu.mem_read(0x10000F9 + 0x0C, 2) != b"\x4D\x5A":
     print "\t[!] Failed to decoded phase 1! Shutting down."
     sys.exit(1)
@@ -106,14 +123,16 @@ for i in FILE_HANDLE:
 FILE_HANDLE.close()
 
 # Locate variables
-XOR_VALUE = FILE_CONTENT[26172:26184]
-#XOR_VALUE = b"\x48\x45\x57\x52\x54\x57\x45\x57\x45\x54\x48\x47"
+#XOR_VALUE = FILE_CONTENT[26172:26184]
+XOR_VALUE = b"\x48\x45\x57\x52\x54\x57\x45\x57\x45\x54\x48\x47"
 
 # loc_406442
 SC = b'\x85\xC9\x7C\x29\xBE\x42\x00\x00\x01\x90\xB8\x67\x66\x66\x66\xF7\xE9\xC1\xFA\x02\x8B\xC2\xC1\xE8\x1F\x03\xC2\x8D\x04\x80\x03\xC0\x8B\xD1\x2B\xD0\x8A\x82\x36\x00\x00\x01\x30\x04\x0E\x41\x81\xF9\x00\x50\x00\x00\x72\xCA'
 
-# Extract payload
-ENC_PAYLOAD = FILE_CONTENT[36880:]
+# Extract payload assuming XOR key of "HEWRTWEWETHG"
+MAGIC_OFFSET = re.search("\x05\x1F\xC7\x52\x57\x57\x45\x57\x41\x54\x48\x45\xA8\xAD\x54\x57", FILE_CONTENT)
+MAGIC_OFFSET = MAGIC_OFFSET.start()
+ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:]
 
 # Build final code to emulate
 X86_CODE32 = SC + XOR_VALUE + ENC_PAYLOAD
@@ -173,3 +192,4 @@ FIND_URL = re.findall("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9
 print "\t### PHASE 3 ###"
 for i in FIND_URL:
     print "\t[-] %s" % i
+
