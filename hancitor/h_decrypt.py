@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.3"
-__date__    = "11SEP2016"
+__version__ = "1.0.4"
+__date__    = "12SEP2016"
+
+# v1.0.4 - 8f26a30a1fc71b7e9eb12e3b94317b7dd5827e2cbcfb3cd3feb684af6a73b4e6
+# Hancitor no longer embedded, instead encoded URls that will download it
 
 # v1.0.3 - b586c11f5485e3a38a156cba10379a4135a8fe34aa2798af8d543c059f0ac9a4
 # Utilized code from Mak and Sysopfb to unpack Upack H1N1 DLL and extract C2
@@ -27,7 +30,6 @@ __date__    = "11SEP2016"
 # Setup Unicorn enviroment
 ADDRESS = 0x1000000
 mu = Uc(UC_ARCH_X86, UC_MODE_32)
-mu.mem_map(ADDRESS, 4 * 1024 * 1024)
 
 ###############
 # First Phase #
@@ -79,6 +81,9 @@ SIZE_VALUE = struct.pack("i", SIZE_VALUE)
 # Converted unpacking to a function to make brute forcing XOR easier
 def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
+    # Initialize stack
+    mu.mem_map(ADDRESS, 4 * 1024 * 1024)
+
     # Build shellcode with variables
     # sub_8A6
     SC = b'\x8A\x04\x0F\x04' + ADD_VALUE + b'\x34' + XOR_VALUE + b'\x88\x04\x0F\x41\x81\xF9' + SIZE_VALUE + b'\x72\xED\x57\xE8\x61\x00\x00\x00\x83\x7D\xFC\x01'
@@ -117,6 +122,47 @@ def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
     return mu
 
+# Samples without embedded PE Hancitor payloads are encoding URLs to download the payload
+def http_decode(ENC_PAYLOAD):
+
+    # Initialize stack
+    mu.mem_map(ADDRESS, 4 * 1024 * 1024)
+
+    # Build shellcode
+    # sub_11B0
+    SC = b'\x6B\xC0\x06\x99\x83\xE2\x07\x03\xC2\xC1\xF8\x03\xC3'
+    # sub_1193
+    SC += b'\x6B\xC0\x06\x25\x07\x00\x00\x80\x79\x05\x48\x83\xC8\xF8\x40\xC3'
+    # sub_11A0
+    SC += b'\x8D\x48\xBF\x80\xF9\x19\x77\x07\x0F\xBE\xC0\x83\xE8\x41\xC3\x8D\x48\x9F\x80\xF9\x19\x77\x07\x0F\xBE\xC0\x83\xE8\x47\xC3\x8D\x48\xD0\x80\xF9\x09\x77\x07\x0F\xBE\xC0\x83\xC0\x04\xC3\x3C\x2B\x75\x04\x6A\x3E\x58\xC3\x3C\x2F\x75\x04\x6A\x3F\x58\xC3\x33\xC0\xC3'
+    # sub_11F0
+    SC += b'\x55\x8B\xEC\x51\x51\x8B\x45\x08\x83\x65\xFC\x00\x89\x45\xF8\x8A\x00\x84\xC0\x74\x68\x53\x56\x57\xE8\xA3\xFF\xFF\xFF\x8B\xD8\x8B\x45\xFC\xE8\x7C\xFF\xFF\xFF\x8B\x4D\xF8\x8D\x14\x08\x8B\x45\xFC\xE8\x7B\xFF\xFF\xFF\x8B\xF8\x8B\xF0\xF7\xDE\x8D\x4E\x08\xB0\x01\xD2\xE0\xFE\xC8\xF6\xD0\x20\x02\x83\xFF\x03\x7D\x09\x8D\x4E\x02\xD2\xE3\x08\x1A\xEB\x15\x8D\x4F\xFE\x8B\xC3\xD3\xF8\x8D\x4E\x0A\xD2\xE3\x08\x02\xC6\x42\x01\x00\x08\x5A\x01\xFF\x45\x08\x8B\x45\x08\x8A\x00\xFF\x45\xFC\x84\xC0\x75\x9E\x5F\x5E\x5B\xC9\xC3'
+
+    X86_CODE32 = SC + ENC_PAYLOAD
+
+    # Write code to memory
+    mu.mem_write(ADDRESS, X86_CODE32)
+    # Start of encoded data
+    mu.reg_write(UC_X86_REG_EAX, 0x1000000 + len(SC))
+    # Initialize Stack for functions
+    mu.reg_write(UC_X86_REG_ESP, 0x1300000)
+    mu.mem_write(0x1300004, b'\x10\x00\x00\xDE')
+
+    # Print 150 characters of encrypted value
+    #print "Encrypt: %s" % mu.mem_read(0x1000000 + len(SC),150)
+
+    # Run the code
+    try:
+        mu.emu_start(ADDRESS, ADDRESS + len(X86_CODE32))
+    except UcError as e:
+        pass
+
+    # Print 150 characters of decrypted value
+    #print "Decrypt: %s" % mu.mem_read(0x1000000 + len(SC),150)
+
+    # Return length of decoded payload, parsing will take place later
+    return mu.mem_read(0x1000000 + len(SC), len(ENC_PAYLOAD))
+
 # Brute force XOR key as they are changing more frequently
 while ord(XOR_VALUE) < 255:
     mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
@@ -125,25 +171,40 @@ while ord(XOR_VALUE) < 255:
         SIZE_VALUE = struct.unpack("i", SIZE_VALUE)[0]
         break
     else:
-        XOR_VALUE = chr(ord(XOR_VALUE) + 1)
+        URLS = []
+        PAYLOAD_SIZE = struct.unpack("i", SIZE_VALUE)[0]
+        DEC_PAYLOAD = http_decode(str(mu.mem_read(0x10000F9, PAYLOAD_SIZE)))
+        if "http://" in DEC_PAYLOAD:
+            for i in str(DEC_PAYLOAD).split("\x00"):
+                if "http://" in i:
+                    URLS.append(i.replace("http", "hxxp"))
+            break
+        else:
+            XOR_VALUE = chr(ord(XOR_VALUE) + 1)
 
 # Print results
-if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9,150):
+if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
     print "\t[!] Failed to decoded phase 1! Shutting down."
     sys.exit(1)
 else:
-    print "\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
-    # Write file to disk
-    FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
-    FILE_HANDLE = open(FILE_NAME, "w")
-    # New anti-analysis added to strip MZ header so we add it back in
-    if mu.mem_read(0x10000F9 + 0x0C, 2) != "\x4D\x5A":
-        print "\t\t[*] Detected stripped MZ header, adding back in"
-        FILE_HANDLE.write(b"\x4D\x5A\x90" + mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
+    if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
+        print "\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
+        # Write file to disk
+        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+        FILE_HANDLE = open(FILE_NAME, "w")
+        # New anti-analysis added to strip MZ header so we add it back in
+        if mu.mem_read(0x10000F9 + 0x0C, 2) != "\x4D\x5A":
+            print "\t\t[*] Detected stripped MZ header, adding back in"
+            FILE_HANDLE.write(b"\x4D\x5A\x90" + mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
+        else:
+            FILE_HANDLE.write(mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
+        FILE_HANDLE.close()
+        print "\t[!] Success! Written to disk as %s" % FILE_NAME
     else:
-        FILE_HANDLE.write(mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
-    FILE_HANDLE.close()
-    print "\t[!] Success! Written to disk as %s" % FILE_NAME
+        print "\t[!] Hancitor not embedded, decoding download URLs"
+        for i in URLS:
+            print "\t[-] %s" % i
+        sys.exit(1)
 
 ################
 # Second Phase #
