@@ -8,6 +8,9 @@ __email__   = "jwhite@paloaltonetworks.com"
 __version__ = "1.0.3"
 __date__    = "11SEP2016"
 
+# v1.0.3 - b586c11f5485e3a38a156cba10379a4135a8fe34aa2798af8d543c059f0ac9a4
+# Utilized code from Mak and Sysopfb to unpack Upack H1N1 DLL and extract C2
+
 # v1.0.2 - b586c11f5485e3a38a156cba10379a4135a8fe34aa2798af8d543c059f0ac9a4
 # Added XOR brute for phase 1
 # Added including stripped MZ header on phase 1 EXE
@@ -266,9 +269,9 @@ else:
     FILE_HANDLE.close()
     print "\t[!] Success! Written to disk as %s" % FILE_NAME
 
-##
-# Fourth Phase
-#
+################
+# Fourth Phase #
+################
 
 # Open file just written and copy data
 FILE_HANDLE = open(FILE_NAME, "r")
@@ -330,7 +333,6 @@ def h1n1_scrape(FILE_NAME):
     mu = Uc(UC_ARCH_X86, UC_MODE_32)
 
     data = open(FILE_NAME, 'rb').read()
-    # t = re.findall(r'(\x33\xc0(.{5}\xab)+)',data)
     t = re.findall(r'(33c0(.{10}ab)+)', binascii.hexlify(data))
 
     mu.mem_map(code_base, 0x1000)
