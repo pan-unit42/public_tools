@@ -5,10 +5,10 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.4"
-__date__    = "12SEP2016"
+__version__ = "1.0.5"
+__date__    = "13SEP2016"
 
-#v1.0.5 - 6dbb31e435e2ff2b7f2b185dc19e6fb63da9ab3553d20b868a298b4c100aeb2a
+# v1.0.5 - 6dbb31e435e2ff2b7f2b185dc19e6fb63da9ab3553d20b868a298b4c100aeb2a
 # New Hancitor second stage XOR
 
 # v1.0.4 - 8f26a30a1fc71b7e9eb12e3b94317b7dd5827e2cbcfb3cd3feb684af6a73b4e6
