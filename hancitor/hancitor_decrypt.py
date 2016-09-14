@@ -9,7 +9,8 @@ __version__ = "1.0.5"
 __date__    = "13SEP2016"
 
 # v1.0.5 - 6dbb31e435e2ff2b7f2b185dc19e6fb63da9ab3553d20b868a298b4c100aeb2a
-# New Hancitor second stage XOR
+# New Hancitor second stage XOR key
+# Change phase 2 to automatically extract XOR key and extract encrypted binary
 
 # v1.0.4 - 8f26a30a1fc71b7e9eb12e3b94317b7dd5827e2cbcfb3cd3feb684af6a73b4e6
 # Hancitor no longer embedded, instead encoded URls that will download it
@@ -220,15 +221,17 @@ for i in FILE_HANDLE:
     FILE_CONTENT += i
 FILE_HANDLE.close()
 
-# Define XOR/Magic offset variables
-# TODO: Convert to bruteforce/automated detecting of offset for unknown XOR keys
+def phase2_xorhunt(FILE_NAME):
+    # Previously seen XOR keys
+    # "HEWRTWEWET"
+    # "BLISODOFDO"
+    pe = pefile.PE(FILE_NAME)
+    for i in pe.sections:
+        if ".rdata" in i.Name:
+            XOR_VALUE = re.search("\x00\x00\x00\x00[\x01-\xFF]{10}", i.get_data()).group(0)[4:]
+    return XOR_VALUE
 
-MAGIC_VALUES = {
-    "HEWRTWEWET":[b"\x48\x45\x57\x52\x54\x57\x45\x57\x45\x54","\x05\x1F\xC7\x52\x57\x57\x45\x57\x41\x54\x48\x45\xA8\xAD\x54\x57"],
-    "BLISODOFDO":[b"\x42\x4C\x49\x53\x4F\x44\x4F\x46\x44\x4F","\x0F\x16\xD9\x53\x4C\x44\x4F\x46\x40\x4F\x42\x4C\xB6\xAC\x4F\x44"]
-}
-
-def phase2_unpack(XOR_VALUE, MAGIC_OFFSET):
+def phase2_unpack(XOR_VALUE):
 
     # Initialize stack
     mu.mem_map(ADDRESS, 4 * 1024 * 1024)
@@ -236,11 +239,13 @@ def phase2_unpack(XOR_VALUE, MAGIC_OFFSET):
     # loc_406442
     SC = b'\x85\xC9\x7C\x29\xBE\x40\x00\x00\x01\x90\xB8\x67\x66\x66\x66\xF7\xE9\xC1\xFA\x02\x8B\xC2\xC1\xE8\x1F\x03\xC2\x8D\x04\x80\x03\xC0\x8B\xD1\x2B\xD0\x8A\x82\x36\x00\x00\x01\x30\x04\x0E\x41\x81\xF9\x00\x50\x00\x00\x72\xCA'
 
-    MAGIC_OFFSET = re.search(MAGIC_OFFSET, FILE_CONTENT)
+    MAGIC_OFFSET = re.search(XOR_VALUE, FILE_CONTENT)
     if MAGIC_OFFSET == None:
         return
-    MAGIC_OFFSET = MAGIC_OFFSET.start()
-    ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:]
+    else:
+        # Identifies start of encrypted binary
+        MAGIC_OFFSET = list([x.start() for x in re.finditer(XOR_VALUE, FILE_CONTENT)])[1] - 30
+    ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + 20480]
 
     # Build final code to emulate
     X86_CODE32 = SC + XOR_VALUE + ENC_PAYLOAD
@@ -270,16 +275,11 @@ def phase2_unpack(XOR_VALUE, MAGIC_OFFSET):
 
 print "\t#### PHASE 2 ####"
 
-# Iterate over known keys
-for entry in MAGIC_VALUES:
+# Find XOR key
+XOR_VALUE = phase2_xorhunt(FILE_NAME)
 
-    XOR_VALUE = MAGIC_VALUES[entry][0]
-    MAGIC_OFFSET = MAGIC_VALUES[entry][1]
-
-    DEC_PAYLOAD = phase2_unpack(XOR_VALUE, MAGIC_OFFSET)
-
-    if DEC_PAYLOAD != None and "This program cannot be run in DOS mode" in DEC_PAYLOAD:
-        break
+# Decode payload
+DEC_PAYLOAD = phase2_unpack(XOR_VALUE)
 
 # Print results
 if "This program cannot be run in DOS mode" not in DEC_PAYLOAD:
