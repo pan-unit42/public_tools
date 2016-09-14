@@ -8,6 +8,9 @@ __email__   = "jwhite@paloaltonetworks.com"
 __version__ = "1.0.4"
 __date__    = "12SEP2016"
 
+#v1.0.5 - 6dbb31e435e2ff2b7f2b185dc19e6fb63da9ab3553d20b868a298b4c100aeb2a
+# New Hancitor second stage XOR
+
 # v1.0.4 - 8f26a30a1fc71b7e9eb12e3b94317b7dd5827e2cbcfb3cd3feb684af6a73b4e6
 # Hancitor no longer embedded, instead encoded URls that will download it
 
@@ -217,55 +220,80 @@ for i in FILE_HANDLE:
     FILE_CONTENT += i
 FILE_HANDLE.close()
 
-# Locate variables
-#XOR_VALUE = FILE_CONTENT[26172:26184]
-XOR_VALUE = b"\x48\x45\x57\x52\x54\x57\x45\x57\x45\x54\x48\x47"
+# Define XOR/Magic offset variables
+# TODO: Convert to bruteforce/automated detecting of offset for unknown XOR keys
 
-# loc_406442
-SC = b'\x85\xC9\x7C\x29\xBE\x42\x00\x00\x01\x90\xB8\x67\x66\x66\x66\xF7\xE9\xC1\xFA\x02\x8B\xC2\xC1\xE8\x1F\x03\xC2\x8D\x04\x80\x03\xC0\x8B\xD1\x2B\xD0\x8A\x82\x36\x00\x00\x01\x30\x04\x0E\x41\x81\xF9\x00\x50\x00\x00\x72\xCA'
+MAGIC_VALUES = {
+    "HEWRTWEWET":[b"\x48\x45\x57\x52\x54\x57\x45\x57\x45\x54","\x05\x1F\xC7\x52\x57\x57\x45\x57\x41\x54\x48\x45\xA8\xAD\x54\x57"],
+    "BLISODOFDO":[b"\x42\x4C\x49\x53\x4F\x44\x4F\x46\x44\x4F","\x0F\x16\xD9\x53\x4C\x44\x4F\x46\x40\x4F\x42\x4C\xB6\xAC\x4F\x44"]
+}
 
-# Extract payload assuming XOR key of "HEWRTWEWETHG"
-MAGIC_OFFSET = re.search("\x05\x1F\xC7\x52\x57\x57\x45\x57\x41\x54\x48\x45\xA8\xAD\x54\x57", FILE_CONTENT)
-MAGIC_OFFSET = MAGIC_OFFSET.start()
-ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:]
+def phase2_unpack(XOR_VALUE, MAGIC_OFFSET):
 
-# Build final code to emulate
-X86_CODE32 = SC + XOR_VALUE + ENC_PAYLOAD
+    # Initialize stack
+    mu.mem_map(ADDRESS, 4 * 1024 * 1024)
 
-# Write code to memory
-mu.mem_write(ADDRESS, X86_CODE32)
-# Start of encoded data
-mu.reg_write(UC_X86_REG_EDX, 0x1000042)
-# Initialize ECX counter to 0
-mu.reg_write(UC_X86_REG_ECX, 0x0)
-# Initialize Stack for functions
-mu.reg_write(UC_X86_REG_ESP, 0x1300000)
+    # loc_406442
+    SC = b'\x85\xC9\x7C\x29\xBE\x40\x00\x00\x01\x90\xB8\x67\x66\x66\x66\xF7\xE9\xC1\xFA\x02\x8B\xC2\xC1\xE8\x1F\x03\xC2\x8D\x04\x80\x03\xC0\x8B\xD1\x2B\xD0\x8A\x82\x36\x00\x00\x01\x30\x04\x0E\x41\x81\xF9\x00\x50\x00\x00\x72\xCA'
 
-# Print 150 characters of encrypted value
-#print "Encrypt: %s" % mu.mem_read(0x1000042,150)
+    MAGIC_OFFSET = re.search(MAGIC_OFFSET, FILE_CONTENT)
+    if MAGIC_OFFSET == None:
+        return
+    MAGIC_OFFSET = MAGIC_OFFSET.start()
+    ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:]
 
-# Run the code
-try:
-    mu.emu_start(ADDRESS, ADDRESS + len(X86_CODE32))
-except UcError as e:
-    pass
+    # Build final code to emulate
+    X86_CODE32 = SC + XOR_VALUE + ENC_PAYLOAD
 
-# Print 150 characters of decrypted value
-#print "Decrypt: %s" % mu.mem_read(0x1000042,150)
+    # Write code to memory
+    mu.mem_write(ADDRESS, X86_CODE32)
+    # Start of encoded data
+    mu.reg_write(UC_X86_REG_EDX, 0x1000040)
+    # Initialize ECX counter to 0
+    mu.reg_write(UC_X86_REG_ECX, 0x0)
+    # Initialize Stack for functions
+    mu.reg_write(UC_X86_REG_ESP, 0x1300000)
+
+    # Print 150 characters of encrypted value
+    #print "Encrypt: %s" % mu.mem_read(0x1000040,150)
+
+    # Run the code
+    try:
+        mu.emu_start(ADDRESS, ADDRESS + len(X86_CODE32))
+    except UcError as e:
+        pass
+
+    # Print 150 characters of decrypted value
+    #print "Decrypt: %s" % mu.mem_read(0x1000040,150)
+
+    return mu.mem_read(0x1000040, 0x5000)
+
+print "\t#### PHASE 2 ####"
+
+# Iterate over known keys
+for entry in MAGIC_VALUES:
+
+    XOR_VALUE = MAGIC_VALUES[entry][0]
+    MAGIC_OFFSET = MAGIC_VALUES[entry][1]
+
+    DEC_PAYLOAD = phase2_unpack(XOR_VALUE, MAGIC_OFFSET)
+
+    if DEC_PAYLOAD != None and "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+        break
 
 # Print results
-print "\t#### PHASE 2 ####\n\t[-] XOR:  %s" % (XOR_VALUE)
-if "This program cannot be run in DOS mode" not in mu.mem_read(0x1000042, 150):
-    if re.search("NullsoftInst", FILE_CONTENT):
+if "This program cannot be run in DOS mode" not in DEC_PAYLOAD:
+    if re.search("NullsoftInst", DEC_PAYLOAD):
         print "\t[!] Detected Nullsoft Installer! Shutting down."
     else:
         print "\t[!] Failed to decode phase 2! Shutting down."
     sys.exit(1)
 else:
+    print "\t[-] XOR: % s" % (XOR_VALUE)
     # Write file to disk
     FILE_NAME = sys.argv[1].split(".")[0] + "_S2.exe"
     FILE_HANDLE = open(FILE_NAME, "w")
-    FILE_HANDLE.write(mu.mem_read(0x1000042, 0x5000))
+    FILE_HANDLE.write(mu.mem_read(0x1000040, 0x5000))
     FILE_HANDLE.close()
     print "\t[!] Success! Written to disk as %s" % FILE_NAME
 
