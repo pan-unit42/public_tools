@@ -5,8 +5,12 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.5"
-__date__    = "13SEP2016"
+__version__ = "1.0.6"
+__date__    = "26SEP2016"
+
+# v1.0.6 - 98f4e4436a7b2a0844d94526f5be5b489604d2b1f586be16ef578cc40d6a61b7
+# Brute force of second stage keys (false key plants/re-positioned)
+# Cleaned up handling for multiple sections
 
 # v1.0.5 - 6dbb31e435e2ff2b7f2b185dc19e6fb63da9ab3553d20b868a298b4c100aeb2a
 # New Hancitor second stage XOR key
@@ -50,7 +54,8 @@ FILE_HANDLE.close()
 
 # Pull out base64 encoded shellcode
 try:
-    SC_DATA = re.search("[A-Za-z0-9+/]{1024,}.*([A-Za-z0-9+/]{128,}==|[A-Za-z0-9+/]{128,}=)", FILE_CONTENT)
+    # Adjusted to try and account for catastrophic backtracking
+    SC_DATA = re.search("\00[A-Za-z0-9+/]{3000}[A-Za-z0-9+/]+[A-Za-z0-9+/]{128,}[=]{0,2}\00", FILE_CONTENT)
     if SC_DATA != None:
         SC_DATA = SC_DATA.group()
         SC_DATA = base64.b64decode(SC_DATA)
@@ -58,13 +63,16 @@ except:
     print "[!] Unable to process %s" % sys.argv[1]
     sys.exit(1)
 
+#SC_DATA = None
+
 # Extract data depending on version of dropper variables
 if SC_DATA != None:
     print "\t[-] Found B64 shellcode"
     # Pull from shellcode
-    ADD_VALUE  = SC_DATA[2966]
-    XOR_VALUE  = SC_DATA[2968]
-    SIZE_VALUE = SC_DATA[2975:2979]
+    INIT_VALUES = re.search("\x8A\x04\x0F\x04.\x34.\x88\x04\x0F\x41\x81\xF9....", SC_DATA).group(0)
+    ADD_VALUE = INIT_VALUES[4]
+    XOR_VALUE  = INIT_VALUES[6]
+    SIZE_VALUE = INIT_VALUES[13:]
     # Extract payload base on shellcode data
     MAGIC_OFFSET = re.search("\x50\x4F\x4C\x41", FILE_CONTENT)
     MAGIC_OFFSET = MAGIC_OFFSET.start()
@@ -73,9 +81,12 @@ if SC_DATA != None:
 else:
     print "\t[!] No raw B64 shellcode, going blind"
     # Extract payload blind without shellcode
-    MAGIC_OFFSET = re.findall("\x50\x4F\x4C\x41.*\x00{128}", FILE_CONTENT)
-    SIZE_VALUE = len(MAGIC_OFFSET[0]) - 128
-    ENC_PAYLOAD = MAGIC_OFFSET[0][0:SIZE_VALUE]
+    try:
+        ENC_PAYLOAD = re.search("\x50\x4F\x4C\x41[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0)
+        SIZE_VALUE = len(ENC_PAYLOAD) - 128
+    except:
+        print "\t[!] Magic header not found! Shutting down"
+        sys.exit(1)
     # Phase1 most common variables
     ADD_VALUE  = "\x03"
     XOR_VALUE  = "\x00" # Seen \x13 and \x10
@@ -178,17 +189,17 @@ while ord(XOR_VALUE) < 255:
         URLS = []
         PAYLOAD_SIZE = struct.unpack("i", SIZE_VALUE)[0]
         DEC_PAYLOAD = http_decode(str(mu.mem_read(0x10000F9, PAYLOAD_SIZE)))
-        if "http://" in DEC_PAYLOAD:
-            for i in str(DEC_PAYLOAD).split("\x00"):
-                if "http://" in i:
-                    URLS.append(i.replace("http", "hxxp"))
+        if re.search("http://.*\.exe", DEC_PAYLOAD) and XOR_VALUE != 0x01:
+            print "\t\t[*] Found XOR key %s " % hex(ord(XOR_VALUE))
+            for i in re.search("http://.*\.exe", DEC_PAYLOAD).group(0).split("\x00"):
+                URLS.append(i.replace("http", "hxxp"))
             break
         else:
             XOR_VALUE = chr(ord(XOR_VALUE) + 1)
 
 # Print results
 if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
-    print "\t[!] Failed to decoded phase 1! Shutting down."
+    print "\t[!] Failed to decode phase 1! Shutting down"
     sys.exit(1)
 else:
     if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
@@ -204,6 +215,11 @@ else:
             FILE_HANDLE.write(mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
         FILE_HANDLE.close()
         print "\t[!] Success! Written to disk as %s" % FILE_NAME
+        # 00a437416a2d5e23dbf671e4c1498cb0d0978ce4ee8bfbaca49413352d553a65
+        # Phase 2 is Nullsoft directly
+        if re.search("NullsoftInst", mu.mem_read(0x10000F9, SIZE_VALUE)):
+            print "\t[!] Detected Nullsoft Installer! Shutting down"
+            sys.exit(1)
     else:
         print "\t[!] Hancitor not embedded, decoding download URLs"
         for i in URLS:
@@ -225,10 +241,14 @@ def phase2_xorhunt(FILE_NAME):
     # Previously seen XOR keys
     # "HEWRTWEWET"
     # "BLISODOFDO"
-    pe = pefile.PE(FILE_NAME)
-    for i in pe.sections:
-        if ".rdata" in i.Name:
-            XOR_VALUE = re.search("\x00\x00\x00\x00[\x01-\xFF]{10}", i.get_data()).group(0)[4:]
+    try:
+        pe = pefile.PE(FILE_NAME)
+        for i in pe.sections:
+            if ".rdata" in i.Name:
+                XOR_VALUE = re.findall("\x00\x00[\x41-\x5A\x61-\x7A]{10}", i.get_data())#.group(0)[3:]
+    except:
+        print "\t[!] Unknown packer, unable to decode! Shutting down"
+        sys.exit(1)
     return XOR_VALUE
 
 def phase2_unpack(XOR_VALUE):
@@ -240,11 +260,24 @@ def phase2_unpack(XOR_VALUE):
     SC = b'\x85\xC9\x7C\x29\xBE\x40\x00\x00\x01\x90\xB8\x67\x66\x66\x66\xF7\xE9\xC1\xFA\x02\x8B\xC2\xC1\xE8\x1F\x03\xC2\x8D\x04\x80\x03\xC0\x8B\xD1\x2B\xD0\x8A\x82\x36\x00\x00\x01\x30\x04\x0E\x41\x81\xF9\x00\x50\x00\x00\x72\xCA'
 
     MAGIC_OFFSET = re.search(XOR_VALUE, FILE_CONTENT)
+
     if MAGIC_OFFSET == None:
         return
     else:
-        # Identifies start of encrypted binary
-        MAGIC_OFFSET = list([x.start() for x in re.finditer(XOR_VALUE, FILE_CONTENT)])[1] - 30
+        try:
+            # Identifies start of encrypted binary
+            MAGIC_OFFSET = list([x.start() for x in re.finditer(XOR_VALUE, FILE_CONTENT)])[1] - 30
+            MAGIC_BASE = re.search(XOR_VALUE, FILE_CONTENT).start()
+            MAGIC_COUNT = 1
+            # 001a4073d1cdefeb67a813207fde44c6430323eac1faf94ab05649b7e39b9f43_S1.exe
+            # Some samples have the decrypt key repeated in the .rdata section
+            while MAGIC_OFFSET - MAGIC_BASE < 1000:
+                MAGIC_OFFSET = list([x.start() for x in re.finditer(XOR_VALUE, FILE_CONTENT)])[MAGIC_COUNT] - 30
+                MAGIC_COUNT += 1
+        except:
+            return ""
+            #print "\t[!] Encrypted payload not found! Shutting down"
+            #sys.exit(1)
     ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + 20480]
 
     # Build final code to emulate
@@ -275,21 +308,26 @@ def phase2_unpack(XOR_VALUE):
 
 print "\t#### PHASE 2 ####"
 
-# Find XOR key
+# Find XOR keys
 XOR_VALUE = phase2_xorhunt(FILE_NAME)
 
 # Decode payload
-DEC_PAYLOAD = phase2_unpack(XOR_VALUE)
+for key in XOR_VALUE:
+    key = key[2:] # Strip two leading nulls from regex
+    DEC_PAYLOAD = phase2_unpack(key)
+    if "This program cannot be run in DOS mode" in DEC_PAYLOAD or "NullsoftInst" in DEC_PAYLOAD:
+        XOR_VALUE = key
+        print "\t[-] XOR: %s" % XOR_VALUE
+        break
 
 # Print results
 if "This program cannot be run in DOS mode" not in DEC_PAYLOAD:
     if re.search("NullsoftInst", DEC_PAYLOAD):
-        print "\t[!] Detected Nullsoft Installer! Shutting down."
+        print "\t[!] Detected Nullsoft Installer! Shutting down"
     else:
-        print "\t[!] Failed to decode phase 2! Shutting down."
+        print "\t[!] Failed to decode phase 2! Shutting down"
     sys.exit(1)
 else:
-    print "\t[-] XOR: % s" % (XOR_VALUE)
     # Write file to disk
     FILE_NAME = sys.argv[1].split(".")[0] + "_S2.exe"
     FILE_HANDLE = open(FILE_NAME, "w")
@@ -347,7 +385,7 @@ DEC_PAYLOAD = h1n1_packed(FILE_CONTENT)
 
 # Print results
 if "Upack" not in DEC_PAYLOAD:
-    print "\t[!] Failed to decode phase 3! Shutting down."
+    print "\t[!] Failed to decode phase 3! Shutting down"
     sys.exit(1)
 else:
     print "\t[-] Detected H1N1 DLL packed with Upack"
