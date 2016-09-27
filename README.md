@@ -1,4 +1,4 @@
-![](https://paloaltonetworks.com/content/dam/paloaltonetworks-com/en_US/images/logos/brand/PANW_Unit42_Logo.png)
+![](https://s3.amazonaws.com/u42/unit42.png)
 
 # Unit 42 Public Tools Repo
 
