@@ -11,6 +11,10 @@ __date__    = "26SEP2016"
 # v1.0.6 - 98f4e4436a7b2a0844d94526f5be5b489604d2b1f586be16ef578cc40d6a61b7
 # Brute force of second stage keys (false key plants/re-positioned)
 # Cleaned up handling for multiple sections
+# e5b54afc85e7d282d7b2c0045e6e74967ff41ac571880929728f4d49693003a8
+# Also added new first stage decoder for above hash variants
+# 2ac7d8a063127641e71911941c549b8ce889c8587c1d948c72b1aca900069e5e
+# New mechanisms for H1N1 decrypting added
 
 # v1.0.5 - 6dbb31e435e2ff2b7f2b185dc19e6fb63da9ab3553d20b868a298b4c100aeb2a
 # New Hancitor second stage XOR key
@@ -53,17 +57,11 @@ for i in FILE_HANDLE:
 FILE_HANDLE.close()
 
 # Pull out base64 encoded shellcode
-try:
-    # Adjusted to try and account for catastrophic backtracking
-    SC_DATA = re.search("\00[A-Za-z0-9+/]{3000}[A-Za-z0-9+/]+[A-Za-z0-9+/]{128,}[=]{0,2}\00", FILE_CONTENT)
-    if SC_DATA != None:
-        SC_DATA = SC_DATA.group()
-        SC_DATA = base64.b64decode(SC_DATA)
-except:
-    print "[!] Unable to process %s" % sys.argv[1]
-    sys.exit(1)
-
-#SC_DATA = None
+# Adjusted to try and account for catastrophic backtracking
+SC_DATA = re.search("\00[A-Za-z0-9+/]{3000,}[=]{1,2}\00", FILE_CONTENT)
+if SC_DATA != None:
+    SC_DATA = SC_DATA.group()
+    SC_DATA = base64.b64decode(SC_DATA)
 
 # Extract data depending on version of dropper variables
 if SC_DATA != None:
@@ -81,17 +79,42 @@ if SC_DATA != None:
 else:
     print "\t[!] No raw B64 shellcode, going blind"
     # Extract payload blind without shellcode
-    try:
+    if re.search("\x50\x4F\x4C\x41[\x00-\xFF]+\x00{128}", FILE_CONTENT):
         ENC_PAYLOAD = re.search("\x50\x4F\x4C\x41[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0)
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
-    except:
-        print "\t[!] Magic header not found! Shutting down"
-        sys.exit(1)
+    # e5b54afc85e7d282d7b2c0045e6e74967ff41ac571880929728f4d49693003a8
+    # If no payload found try to search for embedded PE's seen in other variants
+    else:
+        XOR_VALUE = 0
+        print "\t[!] Magic header not found!"
+        try:
+            ENC_PAYLOAD = list([x.start() for x in re.finditer("\xFF{400}", FILE_CONTENT)])[-1]
+            while XOR_VALUE < 16:
+                DEC_PAYLOAD = ""
+                # We don't know end of binary so we scrape all and regex B64 out
+                for i in FILE_CONTENT[ENC_PAYLOAD:]:
+                    if (ord(i) + 3) ^ 12 < 255:
+                        DEC_PAYLOAD += chr((ord(i) + 3) ^ XOR_VALUE)
+                B64_PE = re.search("[A-Za-z0-9+/]{3000,}[=]{1,2}", DEC_PAYLOAD)
+                if B64_PE != None:
+                    try:
+                        B64_PE = B64_PE.group()
+                        B64_PE = base64.b64decode(B64_PE)
+                        if "This program cannot be run in DOS mode" in B64_PE:
+                            print "\t[-] Attempting to find encoded binary"
+                            print "\t\t[*] Found XOR key %s " % hex(XOR_VALUE)
+                            break
+                    except:
+                        continue
+                XOR_VALUE += 1
+            if XOR_VALUE == 16:
+                sys.exit(1)
+        except:
+            print "\t[!] Unable to process %s" % sys.argv[1]
+            sys.exit(1)
     # Phase1 most common variables
     ADD_VALUE  = "\x03"
     XOR_VALUE  = "\x00" # Seen \x13 and \x10
-
-SIZE_VALUE = struct.pack("i", SIZE_VALUE)
 
 # Converted unpacking to a function to make brute forcing XOR easier
 def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
@@ -178,53 +201,65 @@ def http_decode(ENC_PAYLOAD):
     # Return length of decoded payload, parsing will take place later
     return mu.mem_read(0x1000000 + len(SC), len(ENC_PAYLOAD))
 
-# Brute force XOR key as they are changing more frequently
-while ord(XOR_VALUE) < 255:
-    mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
-    if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
-        print "\t\t[*] Found XOR key %s" % hex(ord(XOR_VALUE))
-        SIZE_VALUE = struct.unpack("i", SIZE_VALUE)[0]
-        break
-    else:
-        URLS = []
-        PAYLOAD_SIZE = struct.unpack("i", SIZE_VALUE)[0]
-        DEC_PAYLOAD = http_decode(str(mu.mem_read(0x10000F9, PAYLOAD_SIZE)))
-        if re.search("http://.*\.exe", DEC_PAYLOAD) and XOR_VALUE != 0x01:
-            print "\t\t[*] Found XOR key %s " % hex(ord(XOR_VALUE))
-            for i in re.search("http://.*\.exe", DEC_PAYLOAD).group(0).split("\x00"):
-                URLS.append(i.replace("http", "hxxp"))
+def phase1(SIZE_VALUE, XOR_VALUE):
+    SIZE_VALUE = struct.pack("i", SIZE_VALUE)
+
+    # Brute force XOR key as they are changing more frequently
+    while ord(XOR_VALUE) < 255:
+        mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
+        if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
+            print "\t\t[*] Found XOR key %s" % hex(ord(XOR_VALUE))
+            SIZE_VALUE = struct.unpack("i", SIZE_VALUE)[0]
             break
         else:
-            XOR_VALUE = chr(ord(XOR_VALUE) + 1)
+            URLS = []
+            PAYLOAD_SIZE = struct.unpack("i", SIZE_VALUE)[0]
+            DEC_PAYLOAD = http_decode(str(mu.mem_read(0x10000F9, PAYLOAD_SIZE)))
+            if re.search("http://.*\.exe", DEC_PAYLOAD) and XOR_VALUE != 0x01:
+                print "\t\t[*] Found XOR key %s " % hex(ord(XOR_VALUE))
+                for i in re.search("http://.*\.exe", DEC_PAYLOAD).group(0).split("\x00"):
+                    URLS.append(i.replace("http", "hxxp"))
+                break
+            else:
+                XOR_VALUE = chr(ord(XOR_VALUE) + 1)
 
-# Print results
-if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
-    print "\t[!] Failed to decode phase 1! Shutting down"
-    sys.exit(1)
-else:
-    if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
-        print "\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
-        # Write file to disk
-        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
-        FILE_HANDLE = open(FILE_NAME, "w")
-        # New anti-analysis added to strip MZ header so we add it back in
-        if mu.mem_read(0x10000F9 + 0x0C, 2) != "\x4D\x5A":
-            print "\t\t[*] Detected stripped MZ header, adding back in"
-            FILE_HANDLE.write(b"\x4D\x5A\x90" + mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
-        else:
-            FILE_HANDLE.write(mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
-        FILE_HANDLE.close()
-        print "\t[!] Success! Written to disk as %s" % FILE_NAME
-        # 00a437416a2d5e23dbf671e4c1498cb0d0978ce4ee8bfbaca49413352d553a65
-        # Phase 2 is Nullsoft directly
-        if re.search("NullsoftInst", mu.mem_read(0x10000F9, SIZE_VALUE)):
-            print "\t[!] Detected Nullsoft Installer! Shutting down"
-            sys.exit(1)
-    else:
-        print "\t[!] Hancitor not embedded, decoding download URLs"
-        for i in URLS:
-            print "\t[-] %s" % i
+    # Print results
+    if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
+        print "\t[!] Failed to decode phase 1! Shutting down"
         sys.exit(1)
+    else:
+        if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
+            print "\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
+            # Write file to disk
+            FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+            FILE_HANDLE = open(FILE_NAME, "w")
+            # New anti-analysis added to strip MZ header so we add it back in
+            if mu.mem_read(0x10000F9 + 0x0C, 2) != "\x4D\x5A":
+                print "\t\t[*] Detected stripped MZ header, adding back in"
+                FILE_HANDLE.write(b"\x4D\x5A\x90" + mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
+            else:
+                FILE_HANDLE.write(mu.mem_read(0x10000F9 + 0x0C, SIZE_VALUE))
+            FILE_HANDLE.close()
+            print "\t[!] Success! Written to disk as %s" % FILE_NAME
+            # 00a437416a2d5e23dbf671e4c1498cb0d0978ce4ee8bfbaca49413352d553a65
+            # Phase 2 is Nullsoft directly
+            if re.search("NullsoftInst", mu.mem_read(0x10000F9, SIZE_VALUE)):
+                print "\t[!] Detected Nullsoft Installer! Shutting down"
+                sys.exit(1)
+        else:
+            print "\t[!] Hancitor not embedded, decoding download URLs"
+            for i in URLS:
+                print "\t[-] %s" % i
+            sys.exit(1)
+
+try:
+    FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+    FILE_HANDLE = open(FILE_NAME, "w")
+    FILE_HANDLE.write(B64_PE)
+    FILE_HANDLE.close()
+    print "\t[!] Success! Written to disk as %s" % FILE_NAME
+except:
+    phase1(SIZE_VALUE, XOR_VALUE)
 
 ################
 # Second Phase #
@@ -354,10 +389,8 @@ print "\t### PHASE 3 ###"
 if FIND_URL == []:
     if __name__ == '__main__':
         print "\t[!] No Hancitor URLs found"
-        # Search for "HEWRTWEWET", which is used subsequent H1N1 packed file (using ZwUnmapViewOfSection injection into explorer.exe)
-        if re.search(b"\x48\x45\x57\x52\x54\x57\x45\x57\x45\x54", FILE_CONTENT):
-            if re.search(b"\x6A\x40\x6A\x00\x6A\x01\x50\x6A\x00\x6A\x00\x6A\x00\x51\x6A\xFF\xFF\x75\xEC", FILE_CONTENT):
-                print "\t\t[*] Detected H1N1 payload (ZwUnmapViewOfSection injection)"
+        if re.search(XOR_VALUE, FILE_CONTENT):
+               print "\t\t[*] Detected potential H1N1 payload"
         else:
             sys.exit(1)
 else:
@@ -367,11 +400,22 @@ else:
     sys.exit(1)
 
 def h1n1_packed(FILE_CONTENT):
-    MAGIC_OFFSET = re.findall("\x32\x00\x00\x7E\x31\x00\x00[\x00-\xFF]*\x00{128}", FILE_CONTENT)
-    SIZE_VALUE = len(MAGIC_OFFSET[0]) - 64
-    ENC_PAYLOAD = MAGIC_OFFSET[0][7:SIZE_VALUE]
-    XOR_VALUE = ord(ENC_PAYLOAD[0]) ^ 77 # "M"
-    print "\t[-] Found start of rotating XOR %s" % (hex(XOR_VALUE))
+    NULL_OFFSET = list([x.start() for x in re.finditer("\x00\x00..", FILE_CONTENT)])
+    for i in NULL_OFFSET:
+        XOR_VALUE = 0
+        TEST_SECTION = FILE_CONTENT[i:i + 4]
+        while XOR_VALUE < 254:
+            M_VAL = ord(TEST_SECTION[2]) ^ XOR_VALUE
+            Z_VAL = ord(TEST_SECTION[3]) ^ (XOR_VALUE + 1)
+            if M_VAL == 77 and Z_VAL == 90:
+                print "\t[-] Found start of rotating XOR %s" % (hex(XOR_VALUE))
+                MAGIC_OFFSET = i + 2
+                SAVE_XOR = XOR_VALUE
+                break
+            XOR_VALUE += 1
+    XOR_VALUE = SAVE_XOR
+    SIZE_VALUE = len(FILE_CONTENT[MAGIC_OFFSET:])
+    ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + SIZE_VALUE]
     DEC_PAYLOAD = ""
     for i in ENC_PAYLOAD:
         DEC_PAYLOAD += chr(ord(i) ^ XOR_VALUE)
