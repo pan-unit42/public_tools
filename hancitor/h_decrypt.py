@@ -252,6 +252,7 @@ def phase1(SIZE_VALUE, XOR_VALUE):
                 print "\t[-] %s" % i
             sys.exit(1)
 
+# Check to see if we detected the B64 embedded payload (not shellcode), otherwise proceed with decoding regularly
 try:
     FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
     FILE_HANDLE = open(FILE_NAME, "w")
@@ -387,12 +388,7 @@ FIND_URL = re.findall("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9
 # Print results
 print "\t### PHASE 3 ###"
 if FIND_URL == []:
-    if __name__ == '__main__':
-        print "\t[!] No Hancitor URLs found"
-        if re.search(XOR_VALUE, FILE_CONTENT):
-               print "\t\t[*] Detected potential H1N1 payload"
-        else:
-            sys.exit(1)
+    print "\t[!] No Hancitor URLs found"
 else:
     print "\t[-] Hancitor URLs"
     for i in FIND_URL:
@@ -504,7 +500,7 @@ def h1n1_scrape(FILE_NAME):
     mu = Uc(UC_ARCH_X86, UC_MODE_32)
 
     data = open(FILE_NAME, 'rb').read()
-    t = re.findall(r'(33c0(.{10}ab)+)', binascii.hexlify(data))
+    t = re.findall(r'(33c0(.{10}ab|.{6}ab)+)', binascii.hexlify(data))
 
     mu.mem_map(code_base, 0x1000)
 
@@ -523,6 +519,8 @@ def h1n1_scrape(FILE_NAME):
         except:
             pass
 
+        # Uncomment for other strings (anti-VM/commands/etc)
+        #print mu.mem_read(STACK + 4096, 100)
         if "gate.php" in mu.mem_read(STACK + 4096, 100):
             URLS.append(str(mu.mem_read(STACK + 4096, 100)))
         mu.mem_write(STACK, '\x00' * (4096 * 2))
