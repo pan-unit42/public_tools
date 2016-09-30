@@ -1,0 +1,11 @@
+##### "YARA" START #####
+
+   1 YARA
+  12 ['heapalloc', 'rtlmovememory', 'enumresourcetypesa']
+ 201 ['heapalloc', 'rtlmovememory', 'callwindowproca']
+ 325 ['heapalloc', 'rtlmovememory', 'enumsystemlanguagegroupsa']
+1469 Empty
+1700 ['heapalloc', 'rtlmovememory', 'enumresourcetypesw']
+33576 ['virtualalloc', 'rtlmovememory', 'callwindowproca']
+
+##### "YARA" END #####
