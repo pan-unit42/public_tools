@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.6"
-__date__    = "26SEP2016"
+__version__ = "1.0.7"
+__date__    = "20OCT2016"
+
+# v1.0.7 - 14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd
+# Hancitor directly embedded - fileless inject of PE but URLs scrapable
 
 # v1.0.6 - 98f4e4436a7b2a0844d94526f5be5b489604d2b1f586be16ef578cc40d6a61b7
 # Brute force of second stage keys (false key plants/re-positioned)
@@ -246,6 +249,14 @@ def phase1(SIZE_VALUE, XOR_VALUE):
             if re.search("NullsoftInst", mu.mem_read(0x10000F9, SIZE_VALUE)):
                 print "\t[!] Detected Nullsoft Installer! Shutting down"
                 sys.exit(1)
+            # 14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd
+            # Direct embed
+            if re.search("/gate.php", mu.mem_read(0x10000F9, SIZE_VALUE)):
+                URLS = re.findall("http://[a-z0-9]{5,50}.[a-z]{2,10}/ls[0-9]{0,2}/gate.php", mu.mem_read(0x10000F9, SIZE_VALUE))
+                print "\t[!] Detected Hancitor URLs"
+                for i in URLS:
+                    print "\t[-] %s" % i
+                sys.exit(1)
         else:
             print "\t[!] Hancitor not embedded, decoding download URLs"
             for i in URLS:
@@ -348,6 +359,7 @@ print "\t#### PHASE 2 ####"
 XOR_VALUE = phase2_xorhunt(FILE_NAME)
 
 # Decode payload
+DEC_PAYLOAD = ""
 for key in XOR_VALUE:
     key = key[2:] # Strip two leading nulls from regex
     DEC_PAYLOAD = phase2_unpack(key)
