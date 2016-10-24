@@ -22,8 +22,9 @@ rule h_dropper : vb_win32api
 		$api_enumsystemlanguagegroups = { 00 45 6E 75 6D 53 79 73 74 65 6D 4C 61 6E 67 75 61 67 65 47 72 6F 75 70 73 [0-1] 00 } // EnumSystemLanguageGroups?
 		$api_enumuilanguages    = { 00 45 6E 75 6D 55 49 4C 61 6E 67 75 61 67 65 73 [0-1] 00 }		// EnumUILanguages?
 		$api_enumdateformats	= { 00 45 6E 75 6D 44 61 74 65 46 6F 72 6D 61 74 73 [0-1] 00 }		// EnumDateFormats?
-		$magic  		= { 50 4F 4C 41 }							// POLA
+		$magic_01  		= { 50 4F 4C 41 }							// POLA
+		$magic_02		= { 53 54 41 52 46 41 4C 4C }						// STARFALL
 
 	condition:
-		uint32be(0) == 0xD0CF11E0 and 3 of ($api_*) and $magic and filesize < 1MB
+		uint32be(0) == 0xD0CF11E0 and 3 of ($api_*) and 1 of ($magic_*) and filesize < 1MB
 }

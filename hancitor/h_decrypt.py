@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.7"
-__date__    = "20OCT2016"
+__version__ = "1.0.8"
+__date__    = "24OCT2016"
+
+# v1.0.8 - b506faff00ae557056d387442e9d4d2a53e87c5f9cd59f75db9ba5525ffa0ba3
+# New shellcode decoding binary with string "STARFALL"
 
 # v1.0.7 - 14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd
 # Hancitor directly embedded - fileless inject of PE but URLs scrapable
@@ -82,8 +85,14 @@ if SC_DATA != None:
 else:
     print "\t[!] No raw B64 shellcode, going blind"
     # Extract payload blind without shellcode
+    # String "POLA"
     if re.search("\x50\x4F\x4C\x41[\x00-\xFF]+\x00{128}", FILE_CONTENT):
         ENC_PAYLOAD = re.search("\x50\x4F\x4C\x41[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0)
+        SIZE_VALUE = len(ENC_PAYLOAD) - 128
+    # b506faff00ae557056d387442e9d4d2a53e87c5f9cd59f75db9ba5525ffa0ba3
+    # String "STARFALL"
+    elif re.search("\x53\x54\x41\x52\x46\x41\x4C\x4C[\x00-\xFF]+\x00{128}", FILE_CONTENT):
+        ENC_PAYLOAD = re.search("\x53\x54\x41\x52\x46\x41\x4C\x4C[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0)
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
     # e5b54afc85e7d282d7b2c0045e6e74967ff41ac571880929728f4d49693003a8
     # If no payload found try to search for embedded PE's seen in other variants
