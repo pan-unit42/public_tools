@@ -11,6 +11,7 @@ rule h_dropper : vb_win32api
 		hash6  = "16aec80227bdce01ed6cafffd723f59f46bbb4e7ab8a7de707501d8ad08ac6aa"
 		hash7  = "3274e2b7228ebd57205da16bb9798fa75439869dad2da4506dbad6150a4f06a2"
 		hash8  = "14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd"
+		hash9  = "b506faff00ae557056d387442e9d4d2a53e87c5f9cd59f75db9ba5525ffa0ba3"
 		description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
 		
 	strings:
@@ -22,8 +23,8 @@ rule h_dropper : vb_win32api
 		$api_enumsystemlanguagegroups = { 00 45 6E 75 6D 53 79 73 74 65 6D 4C 61 6E 67 75 61 67 65 47 72 6F 75 70 73 [0-1] 00 } // EnumSystemLanguageGroups?
 		$api_enumuilanguages    = { 00 45 6E 75 6D 55 49 4C 61 6E 67 75 61 67 65 73 [0-1] 00 }		// EnumUILanguages?
 		$api_enumdateformats	= { 00 45 6E 75 6D 44 61 74 65 46 6F 72 6D 61 74 73 [0-1] 00 }		// EnumDateFormats?
-		$magic_01  		= { 50 4F 4C 41 }							// POLA
-		$magic_02		= { 53 54 41 52 46 41 4C 4C }						// STARFALL
+		$magic_pola  		= { 50 4F 4C 41 }							// POLA
+		$magic_starfall		= { 53 54 41 52 46 41 4C 4C }						// STARFALL
 
 	condition:
 		uint32be(0) == 0xD0CF11E0 and 3 of ($api_*) and 1 of ($magic_*) and filesize < 1MB
