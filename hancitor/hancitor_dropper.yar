@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
 	meta:
 		author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-		date   = "20OCT2016"
+		date   = "25OCT2016"
 		hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
 		hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
 		hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -25,6 +25,7 @@ rule h_dropper : vb_win32api
 		$api_enumdateformats	= { 00 45 6E 75 6D 44 61 74 65 46 6F 72 6D 61 74 73 [0-1] 00 }		// EnumDateFormats?
 		$magic_pola  		= { 50 4F 4C 41 }							// POLA
 		$magic_starfall		= { 53 54 41 52 46 41 4C 4C }						// STARFALL
+		$magic_generic		= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }				// Generic magic header
 
 	condition:
 		uint32be(0) == 0xD0CF11E0 and 3 of ($api_*) and 1 of ($magic_*) and filesize < 1MB
