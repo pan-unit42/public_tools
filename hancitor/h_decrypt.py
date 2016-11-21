@@ -5,8 +5,12 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.8"
-__date__    = "25OCT2016"
+__version__ = "1.0.9"
+__date__    = "21NOV2016"
+
+# v1.0.9 - fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac
+# Adjusted HTTP export to account for change in URL structure, gate.php to forum.php
+# Will not extract regardless of PHP file name
 
 # v1.0.8 - b506faff00ae557056d387442e9d4d2a53e87c5f9cd59f75db9ba5525ffa0ba3
 # New shellcode decoding binary with string "STARFALL"
@@ -252,10 +256,11 @@ def phase1(SIZE_VALUE, XOR_VALUE):
             if re.search("NullsoftInst", mu.mem_read(0x10000F9, SIZE_VALUE)):
                 print "\t[!] Detected Nullsoft Installer! Shutting down"
                 sys.exit(1)
-            # 14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd
+            # 14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd - gate.php
+            # fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac - forum.php
             # Direct embed
-            if re.search("/gate.php", mu.mem_read(0x10000F9, SIZE_VALUE)):
-                URLS = re.findall("http://[a-z0-9]{5,50}.[a-z]{2,10}/ls[0-9]{0,2}/gate.php", mu.mem_read(0x10000F9, SIZE_VALUE))
+            if re.search("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", mu.mem_read(0x10000F9, SIZE_VALUE)):
+                URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", mu.mem_read(0x10000F9, SIZE_VALUE))
                 print "\t[!] Detected Hancitor URLs"
                 for i in URLS:
                     print "\t[-] %s" % i
