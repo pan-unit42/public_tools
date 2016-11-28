@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
 	meta:
 		author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-		date   = "14NOV2016"
+		date   = "28NOV2016"
 		hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
 		hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
 		hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -15,26 +15,34 @@ rule h_dropper : vb_win32api
 		hash10 = "da7b5a206d29bd7ee6abac0431dcfa71e6abab22d63430bc495b62a6105d24e9"
 		hash11 = "45289367ea1ddc0f33e77e2499fde0a3577a5137037f9208ed1cdded92ee2dc2"
 		hash12 = "fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac"
+		hash13 = "0f878f3d538e8c138959df81b344508054a2b3fd68102d619e3e914d81466e94"
 		description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
 		
 	strings:
-		$api_virtualalloc       = { 00 56 69 72 74 75 61 6C 41 6C 6C 6F 63 [0-2] 00 } 			// VirtualAlloc??
-		$api_heapalloc          = { 00 48 65 61 70 41 6C 6C 6F 63 00 } 					// HeapAlloc
-		$api_allocatevirtualmemory = { 00 5A 77 41 6C 6C 6F 63 61 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 } // ZwAllocateVirtualMemory
-		$api_rtlmovememory      = { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 }			// RtlMoveMemory
-		$api_callwindowproc     = { 00 43 61 6C 6C 57 69 6E 64 6F 77 50 72 6F 63 [0-1] 00 }		// CallWindowProc?
-		$api_enumresourcetypes  = { 00 45 6E 75 6D 52 65 73 6F 75 72 63 65 54 79 70 65 73 [0-1] 00 }	// EnumResourceTypes?
-		$api_enumsystemlanguagegroups = { 00 45 6E 75 6D 53 79 73 74 65 6D 4C 61 6E 67 75 61 67 65 47 72 6F 75 70 73 [0-1] 00 } // EnumSystemLanguageGroups?
-		$api_enumuilanguages    = { 00 45 6E 75 6D 55 49 4C 61 6E 67 75 61 67 65 73 [0-1] 00 }		// EnumUILanguages?
-		$api_enumdateformats	= { 00 45 6E 75 6D 44 61 74 65 46 6F 72 6D 61 74 73 [0-1] 00 }		// EnumDateFormats?
-		$api_enumcalendarinfo	= { 00 45 6E 75 6D 43 61 6C 65 6E 64 61 72 49 6E 66 6F [0-1] 00 }	// EnumCalendarInfo?
-		$api_enumtimeformats	= { 00 45 6E 75 6D 54 69 6D 65 46 6F 72 6D 61 74 73 57 [0-1] 00 }	// EnumTimeFormats?
-		$api_shccreatethread	= { 00 53 48 43 72 65 61 74 65 54 68 72 65 61 64 00 } 			// SHCreateThread
-		$magic_pola  		= { 50 4F 4C 41 }							// POLA (also POLAROID)
-		$magic_starfall		= { 53 54 41 52 46 41 4C 4C }						// STARFALL
-		$magic_bullshit		= { 42 55 4C 4C 53 48 49 54 }						// BULLSHIT
-		$magic_fortinet		= { 46 4F 52 54 49 4E 45 54 } 						// FORTINET
-		$magic_generic		= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }				// Generic magic header
+		// Allocate memory
+		$api_virtualalloc       	= { 00 56 69 72 74 75 61 6C 41 6C 6C 6F 63 [0-2] 00 } 						// VirtualAlloc??
+		$api_heapalloc          	= { 00 48 65 61 70 41 6C 6C 6F 63 00 } 								// HeapAlloc
+		$api_allocatevirtualmemory 	= { 00 5A 77 41 6C 6C 6F 63 61 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 } 		// ZwAllocateVirtualMemory
+		// Fill memory
+		$api_rtlmovememory      	= { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 }						// RtlMoveMemory
+		$api_writeprocessmemory 	= { 00 57 72 69 74 65 50 72 6F 63 65 73 73 4D 65 6D 6F 72 79 00 } 				// WriteProcessMemory
+		// Call shellcode
+		$api_callwindowproc     	= { 00 43 61 6C 6C 57 69 6E 64 6F 77 50 72 6F 63 [0-1] 00 }					// CallWindowProc?
+		$api_enumresourcetypes  	= { 00 45 6E 75 6D 52 65 73 6F 75 72 63 65 54 79 70 65 73 [0-1] 00 }				// EnumResourceTypes?
+		$api_enumsystemlanguagegroups 	= { 00 45 6E 75 6D 53 79 73 74 65 6D 4C 61 6E 67 75 61 67 65 47 72 6F 75 70 73 [0-1] 00 } 	// EnumSystemLanguageGroups?
+		$api_enumuilanguages    	= { 00 45 6E 75 6D 55 49 4C 61 6E 67 75 61 67 65 73 [0-1] 00 }					// EnumUILanguages?
+		$api_enumdateformats		= { 00 45 6E 75 6D 44 61 74 65 46 6F 72 6D 61 74 73 [0-1] 00 }					// EnumDateFormats?
+		$api_enumcalendarinfo		= { 00 45 6E 75 6D 43 61 6C 65 6E 64 61 72 49 6E 66 6F [0-1] 00 }				// EnumCalendarInfo?
+		$api_enumtimeformats		= { 00 45 6E 75 6D 54 69 6D 65 46 6F 72 6D 61 74 73 57 [0-1] 00 }				// EnumTimeFormats?
+		$api_shccreatethread		= { 00 53 48 43 72 65 61 74 65 54 68 72 65 61 64 00 } 						// SHCreateThread
+		// Magic headers
+		$magic_pola  			= { 50 4F 4C 41 }										// POLA (also POLAROID)
+		$magic_starfall			= { 53 54 41 52 46 41 4C 4C }									// STARFALL
+		$magic_bullshit			= { 42 55 4C 4C 53 48 49 54 }									// BULLSHIT
+		$magic_fortinet			= { 46 4F 52 54 49 4E 45 54 } 									// FORTINET
+		$magic_fortnnet			= { 46 4F 52 54 4E 4E 45 54 }									// FORTNNET
+		// Generic magic header
+		$magic_generic			= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }							// Generic magic header
 
 	condition:
 		uint32be(0) == 0xD0CF11E0 and 3 of ($api_*) and 1 of ($magic_*) and filesize < 1MB
