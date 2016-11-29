@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
 	meta:
 		author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-		date   = "28NOV2016"
+		date   = "29NOV2016"
 		hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
 		hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
 		hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -16,16 +16,18 @@ rule h_dropper : vb_win32api
 		hash11 = "45289367ea1ddc0f33e77e2499fde0a3577a5137037f9208ed1cdded92ee2dc2"
 		hash12 = "fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac"
 		hash13 = "0f878f3d538e8c138959df81b344508054a2b3fd68102d619e3e914d81466e94"
+		hash14 = "fc0b80006b33ec34f5214f2e88b8085cf0d2861c4492df52886fdcf2d9c62c48"
 		description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
 		
 	strings:
 		// Allocate memory
-		$api_virtualalloc       	= { 00 56 69 72 74 75 61 6C 41 6C 6C 6F 63 [0-2] 00 } 						// VirtualAlloc??
-		$api_heapalloc          	= { 00 48 65 61 70 41 6C 6C 6F 63 00 } 								// HeapAlloc
-		$api_allocatevirtualmemory 	= { 00 5A 77 41 6C 6C 6F 63 61 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 } 		// ZwAllocateVirtualMemory
+		$alloc_virtualalloc       	= { 00 56 69 72 74 75 61 6C 41 6C 6C 6F 63 [0-2] 00 } 						// VirtualAlloc??
+		$alloc_heapalloc          	= { 00 48 65 61 70 41 6C 6C 6F 63 00 } 								// HeapAlloc
+		$alloc_allocatevirtualmemory 	= { 00 5A 77 41 6C 6C 6F 63 61 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 } 		// ZwAllocateVirtualMemory
+		$alloc_heapcreate		= { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 } 						// HeapCreate
 		// Fill memory
-		$api_rtlmovememory      	= { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 }						// RtlMoveMemory
-		$api_writeprocessmemory 	= { 00 57 72 69 74 65 50 72 6F 63 65 73 73 4D 65 6D 6F 72 79 00 } 				// WriteProcessMemory
+		$mem_rtlmovememory      	= { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 }						// RtlMoveMemory
+		$mem_writeprocessmemory 	= { 00 57 72 69 74 65 50 72 6F 63 65 73 73 4D 65 6D 6F 72 79 00 } 				// WriteProcessMemory
 		// Call shellcode
 		$api_callwindowproc     	= { 00 43 61 6C 6C 57 69 6E 64 6F 77 50 72 6F 63 [0-1] 00 }					// CallWindowProc?
 		$api_enumresourcetypes  	= { 00 45 6E 75 6D 52 65 73 6F 75 72 63 65 54 79 70 65 73 [0-1] 00 }				// EnumResourceTypes?
@@ -45,5 +47,5 @@ rule h_dropper : vb_win32api
 		$magic_generic			= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }							// Generic magic header
 
 	condition:
-		uint32be(0) == 0xD0CF11E0 and 3 of ($api_*) and 1 of ($magic_*) and filesize < 1MB
+		uint32be(0) == 0xD0CF11E0 and 1 of ($alloc_*) and 1 of ($mem_*) and 1 of ($api_*) and 1 of ($magic_*) and filesize < 1MB
 }
