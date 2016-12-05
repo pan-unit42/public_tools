@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
 	meta:
 		author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-		date   = "29NOV2016"
+		date   = "05DEC2016"
 		hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
 		hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
 		hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -43,6 +43,7 @@ rule h_dropper : vb_win32api
 		$magic_bullshit			= { 42 55 4C 4C 53 48 49 54 }									// BULLSHIT
 		$magic_fortinet			= { 46 4F 52 54 49 4E 45 54 } 									// FORTINET
 		$magic_fortnnet			= { 46 4F 52 54 4E 4E 45 54 }									// FORTNNET
+		$magic_trueform			= { 54 52 55 45 46 4F 52 4D }									// TRUEFORM
 		// Generic magic header
 		$magic_generic			= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }							// Generic magic header
 
