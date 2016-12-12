@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
 	meta:
 		author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-		date   = "05DEC2016"
+		date   = "12DEC2016"
 		hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
 		hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
 		hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -17,13 +17,15 @@ rule h_dropper : vb_win32api
 		hash12 = "fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac"
 		hash13 = "0f878f3d538e8c138959df81b344508054a2b3fd68102d619e3e914d81466e94"
 		hash14 = "fc0b80006b33ec34f5214f2e88b8085cf0d2861c4492df52886fdcf2d9c62c48"
+		hash15 = "05822b44dd03098ddfd568a51b729345e5e3c63e24df52054a7fc450711bf464"
+		hash16 = "e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f"
 		description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
 		
 	strings:
 		// Allocate memory
 		$alloc_virtualalloc       	= { 00 56 69 72 74 75 61 6C 41 6C 6C 6F 63 [0-2] 00 } 						// VirtualAlloc??
 		$alloc_heapalloc          	= { 00 48 65 61 70 41 6C 6C 6F 63 00 } 								// HeapAlloc
-		$alloc_allocatevirtualmemory 	= { 00 5A 77 41 6C 6C 6F 63 61 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 } 		// ZwAllocateVirtualMemory
+		$alloc_allocatevirtualmemory 	= { 00 [0-2] 41 6C 6C 6F 63 61 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 } 		// ??AllocateVirtualMemory
 		$alloc_heapcreate		= { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 } 						// HeapCreate
 		// Fill memory
 		$mem_rtlmovememory      	= { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 }						// RtlMoveMemory
@@ -44,8 +46,10 @@ rule h_dropper : vb_win32api
 		$magic_fortinet			= { 46 4F 52 54 49 4E 45 54 } 									// FORTINET
 		$magic_fortnnet			= { 46 4F 52 54 4E 4E 45 54 }									// FORTNNET
 		$magic_trueform			= { 54 52 55 45 46 4F 52 4D }									// TRUEFORM
-		// Generic magic header
-		$magic_generic			= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }							// Generic magic header
+		$magic_deadface			= { 44 45 41 44 46 41 43 45 }									// DEADFACE
+		// Shellcode stub
+		$magic_stub1			= { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }							// Stub v1
+		$magic_stub2			= { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }							// Stub v2	
 
 	condition:
 		uint32be(0) == 0xD0CF11E0 and 1 of ($alloc_*) and 1 of ($mem_*) and 1 of ($api_*) and 1 of ($magic_*) and filesize < 1MB

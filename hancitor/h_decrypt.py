@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.9"
-__date__    = "21NOV2016"
+__version__ = "1.1.0"
+__date__    = "12DEC2016"
+
+# v1.1.0 - e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f
+# New header bytes added
 
 # v1.0.9 - fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac
 # Adjusted HTTP export to account for change in URL structure, gate.php to forum.php
@@ -91,8 +94,14 @@ else:
     print "\t[!] No raw B64 shellcode, going blind"
     # Extract payload from magic header bytes
     if re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header \"%s\"" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
+        print "\t\t[*] Found magic header v1 \"%s\"" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
         ENC_PAYLOAD = (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
+        SIZE_VALUE = len(ENC_PAYLOAD) - 128
+    # New magic header
+    # e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f
+    elif re.search("\x08\x01\x01\x01\x06.\x00\x7f\xff\xd9[a-zA-Z]+\x08\x00[\x00-\xff]+\x00{128}", FILE_CONTENT):
+        print "\t\t[*] Found magic header v2 \"%s\"" % (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
+        ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
     else:
         XOR_VALUE = 0
@@ -565,5 +574,4 @@ for i in URLS[0].split("|"):
         print "\t[-] hxxp://%s%s" % (URL, URI)
     except:
         pass
-
 
