@@ -7,15 +7,17 @@ try:
 except:
     transform = 0
 
-__author__ = "Jeff White [karttoon]"
-__email__ = "jwhite@paloaltonetworks.com"
-__version__ = "1.0.2"
+__author__  = "Jeff White [karttoon]"
+__email__   = "jwhite@paloaltonetworks.com"
+__version__ = "1.0.3"
+__date__    = "15DEC2016"
 
 #################### [ API KEY ] ####################
-apikey = ""
+pt_apikey   = ""
+pt_user     = ""
 #################### [ API KEY ] ####################
 
-if apikey == "":
+if pt_apikey == "":
     print "[=] API key not specified in", sys.argv[0]
     sys.exit(1)
 
@@ -39,11 +41,12 @@ graph_footer = """</graph>
 </graphml>"""
 
 def pt_query(value, transform):
-    url = 'https://www.passivetotal.org/api/v1/passive'
-    params = {'api_key': apikey, 'query': value}
+    url = 'https://api.passivetotal.org/v2/dns/passive'
+    auth = (pt_user, pt_apikey)
+    params = {'query': value}
     try:
         # Timeout can also act as a quasi break on hosting sites/large return values - remove the timeout if you really want the nodes
-        pt_response = requests.get(url, params=params, timeout=60)
+        pt_response = requests.get(url, params=params, auth=auth, timeout=60)
 	if pt_response.status_code == 504: # Gateway Timeout error
 		api_result = {'error': 'Gateway Timeout Error - 504'}
 	else:
@@ -69,7 +72,7 @@ def date_convert(date, type): # Normalize the dates coming in from the various s
 
 def build_ptlist(api_result): # Written for just PT at the moment, will need to rework for other APIs
     record_list = {}
-    for record in api_result['results']['records']:
+    for record in api_result['results']:
         record_list[record['recordHash']] = [record['resolve'], record['firstSeen'], record['lastSeen']]
     return record_list
 
@@ -140,7 +143,7 @@ def api_query(value, target_start, target_end, recursive, api, transform):
             for value in value_list: # Iterate through each value
                 if api == "PT": # PassiveTotal API Query
                     api_result = pt_query(value, transform)
-                if api_result['error']: # Print error if it timesout (generally due to a large value of resolutions being returned - seems 1K+ or # of queries
+                if "error" in api_result: # Print error if it timesout (generally due to a large value of resolutions being returned - seems 1K+ or # of queries
                     if transform == False:
                         print "\t[=] *** ERROR processing", value + ", too many resolves or connection issues. ***\n\t\t", api_result['error']
                     processed_list.append(value) # Once finished, add the value to the completed list
@@ -148,7 +151,7 @@ def api_query(value, target_start, target_end, recursive, api, transform):
                     value_list = list(set(value_list)) # Unique the remaining value list
                     value_list.remove(value) # Remove just queried value
                     continue
-                result_count = api_result['result_count']
+                result_count = api_result['totalRecords']
                 if result_count == 0: # If a domain has no resolutions or vice versa, remove from value list and break out of this value loop
                     if transform == False:
                         print "\t[=] *** No results found for", value, ". ***"
@@ -169,14 +172,14 @@ def api_query(value, target_start, target_end, recursive, api, transform):
                 if transform == False:
                     print "    [$]", str(result_count), "results for", value + "."
                 # Try to match the type so it can do the correct lookup
-                if re.match("^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$", api_result['raw_query']):
+                if re.match("^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$", api_result['queryValue']):
                     type = "ip"
-                if re.match(".*\.[a-zA-Z]{2,63}$", api_result['raw_query']): # 63 for the new TLDs - just a general catch all
+                if re.match(".*\.[a-zA-Z]{2,63}$", api_result['queryValue']): # 63 for the new TLDs - just a general catch all
                     type = "domain"
                 if type == "ip":
                     record_list = build_ptlist(api_result) # Query data - only setup for PT currently
                     for record in record_list: # For each domain that resolved to IP
-                        ip_address = api_result['raw_query'] # IP record
+                        ip_address = api_result['queryValue'] # IP record
                         domain = record_list[record][0] # Domain record
                         try: # Pull the PT Tag value for the domain
                             tag_value = api_result['results']['enrichment_map'][domain]['tags'][0]['value']
@@ -211,7 +214,7 @@ def api_query(value, target_start, target_end, recursive, api, transform):
                     record_list = build_ptlist(api_result) # Query data - only setup for PT currently
                     for record in record_list: # For each IP that resolved to domain
                         ip_address = record_list[record][0] # IP record
-                        domain = api_result['raw_query']
+                        domain = api_result['queryValue']
                         try: # Pull the PT Tag value for the IP
                             tag_value = api_result['results']['enrichment_map'][ip_address]['tags'][0]['value']
                             if tag_value == "":

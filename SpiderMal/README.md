@@ -14,6 +14,9 @@ To only 2015 data...
 
 ###[+] Change Log [+]
 
+v1.0.3 - 15DEC2016
+* Updated to work with PassiveTotal's v2 API.
+
 v1.0.2
 * Added some additional error handling for PassiveTotal's API.
 
