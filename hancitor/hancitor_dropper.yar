@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "20DEC2016"
+        date   = "18JAN2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -20,6 +20,7 @@ rule h_dropper : vb_win32api
         hash15 = "05822b44dd03098ddfd568a51b729345e5e3c63e24df52054a7fc450711bf464"
         hash16 = "e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f"
         hash17 = "c56ff7309ed75a4f416e6116f5a3777e15107811085ba96f7ca7f210d6780c14"
+        hash18 = "7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -31,6 +32,7 @@ rule h_dropper : vb_win32api
         // Fill memory
         $mem_rtlmovememory              = { 00 52 74 6C 4D 6F 76 65 4D 65 6D 6F 72 79 00 }                                          // RtlMoveMemory
         $mem_writeprocessmemory         = { 00 57 72 69 74 65 50 72 6F 63 65 73 73 4D 65 6D 6F 72 79 00 }                           // WriteProcessMemory
+        $mem_writevirtualmemory         = { 00 [0-2] 57 72 69 74 65 56 69 72 74 75 61 6C 4D 65 6D 6F 72 79 00 }                     // ??WriteVirtualMemory
         // Call shellcode
         $api_callwindowproc             = { 00 43 61 6C 6C 57 69 6E 64 6F 77 50 72 6F 63 [0-1] 00 }                                 // CallWindowProc?
         $api_enumresourcetypes          = { 00 45 6E 75 6D 52 65 73 6F 75 72 63 65 54 79 70 65 73 [0-1] 00 }                        // EnumResourceTypes?
@@ -49,6 +51,7 @@ rule h_dropper : vb_win32api
         $magic_trueform                 = { 54 52 55 45 46 4F 52 4D }                                                               // TRUEFORM
         $magic_deadface                 = { 44 45 41 44 46 41 43 45 }                                                               // DEADFACE
         $magic_nicework                 = { 4E 49 43 45 57 4F 52 4B }                                                               // NICEWORK
+        $magic_murakami                 = { 4D 55 52 41 4B 41 4D 49 }                                                               // MURAKAMI
         // Shellcode stub
         $magic_stub1                    = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $magic_stub2                    = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2  
