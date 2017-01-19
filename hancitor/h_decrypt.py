@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 from unicorn import *
 from unicorn.x86_const import *
-import re, struct, sys, base64, pefile, binascii
+import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.0"
-__date__    = "12DEC2016"
+__version__ = "1.1.1"
+__date__    = "19JAN2017"
+
+# v1.1.1 - 7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f
+# New variant has encrypted URLs
+# First 5 bytes of a SHA1 hash of a key are used as decrypt key to RC4 encrypted data holding C2 URLs
 
 # v1.1.0 - e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f
-# New header bytes added
+# New stub bytes pre-header added
 
 # v1.0.9 - fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac
 # Adjusted HTTP export to account for change in URL structure, gate.php to forum.php
@@ -94,7 +98,7 @@ else:
     print "\t[!] No raw B64 shellcode, going blind"
     # Extract payload from magic header bytes
     if re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header v1 \"%s\"" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
+        print "\t\t[*] Found magic header v1 '%s'" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
         ENC_PAYLOAD = (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
     # New magic header
@@ -121,7 +125,7 @@ else:
                         B64_PE = base64.b64decode(B64_PE)
                         if "This program cannot be run in DOS mode" in B64_PE:
                             print "\t[-] Attempting to find encoded binary"
-                            print "\t\t[*] Found XOR key %s " % hex(XOR_VALUE)
+                            print "\t\t[*] Found XOR key '%s' " % hex(XOR_VALUE)
                             break
                     except:
                         continue
@@ -227,7 +231,7 @@ def phase1(SIZE_VALUE, XOR_VALUE):
     while ord(XOR_VALUE) < 255:
         mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
         if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
-            print "\t\t[*] Found XOR key %s" % hex(ord(XOR_VALUE))
+            print "\t\t[*] Found XOR key '%s'" % hex(ord(XOR_VALUE))
             SIZE_VALUE = struct.unpack("i", SIZE_VALUE)[0]
             break
         else:
@@ -235,7 +239,7 @@ def phase1(SIZE_VALUE, XOR_VALUE):
             PAYLOAD_SIZE = struct.unpack("i", SIZE_VALUE)[0]
             DEC_PAYLOAD = http_decode(str(mu.mem_read(0x10000F9, PAYLOAD_SIZE)))
             if re.search("http://.*\.exe", DEC_PAYLOAD) and XOR_VALUE != 0x01:
-                print "\t\t[*] Found XOR key %s " % hex(ord(XOR_VALUE))
+                print "\t\t[*] Found XOR key '%s'" % hex(ord(XOR_VALUE))
                 for i in re.search("http://.*\.exe", DEC_PAYLOAD).group(0).split("\x00"):
                     URLS.append(i.replace("http", "hxxp"))
                 break
@@ -272,12 +276,12 @@ def phase1(SIZE_VALUE, XOR_VALUE):
                 URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", mu.mem_read(0x10000F9, SIZE_VALUE))
                 print "\t[!] Detected Hancitor URLs"
                 for i in URLS:
-                    print "\t[-] %s" % i
+                    print "\t[-] %s" % i.replace("http", "hxxp")
                 sys.exit(1)
         else:
             print "\t[!] Hancitor not embedded, decoding download URLs"
             for i in URLS:
-                print "\t[-] %s" % i
+                print "\t[-] %s" % i.replace("http", "hxxp")
             sys.exit(1)
 
 # Check to see if we detected the B64 embedded payload (not shellcode), otherwise proceed with decoding regularly
@@ -372,8 +376,64 @@ def phase2_unpack(XOR_VALUE):
 
 print "\t#### PHASE 2 ####"
 
-# Find XOR keys
-XOR_VALUE = phase2_xorhunt(FILE_NAME)
+# 7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f
+# Started to RC4 encrypt C2 URLs
+if re.search("api.ipify.org", FILE_CONTENT) and re.search("CryptDecrypt", FILE_CONTENT) and re.search("CryptDeriveKey", FILE_CONTENT):
+
+    print "\t[!] Detected RC4 encrypted version C2"
+
+    pe = pefile.PE(FILE_NAME)
+    for i in pe.sections:
+        if ".data" in i.Name:
+
+            DATA_SECTION = i.get_data()
+
+            # Decrypt key is first 5 bytes of a SHA1 hash of the first 8 bytes preceeding RC4 encrypted data
+            RC4_KEY = hashlib.sha1(DATA_SECTION[16:24]).digest()[:5]
+            print "\t\t[*] RC4 decrypt key (hex) '0x%s'" % RC4_KEY.encode('hex')
+            ENCRYPT_DATA = DATA_SECTION[24:]
+
+            # RC4 decrypt routine
+            KEY_ARRAY = range(256)
+            INDEX_MOD = 0
+            DECRYPT_DATA = []
+
+            # KSA
+            for INDEX_VAL in range(256):
+
+                INDEX_MOD = (INDEX_MOD + KEY_ARRAY[INDEX_VAL] + ord(RC4_KEY[INDEX_VAL % len(RC4_KEY)])) % 256
+                KEY_ARRAY[INDEX_VAL], KEY_ARRAY[INDEX_MOD] = KEY_ARRAY[INDEX_MOD], KEY_ARRAY[INDEX_VAL]
+
+            # PRGA
+            INDEX_VAL = 0
+            INDEX_MOD = 0
+
+            for value in ENCRYPT_DATA:
+
+                INDEX_VAL = (INDEX_VAL + 1) % 256
+                INDEX_MOD = (INDEX_MOD + KEY_ARRAY[INDEX_VAL]) % 256
+                KEY_ARRAY[INDEX_VAL], KEY_ARRAY[INDEX_MOD] = KEY_ARRAY[INDEX_MOD], KEY_ARRAY[INDEX_VAL]
+                DECRYPT_BYTE = ord(value) ^ KEY_ARRAY[(KEY_ARRAY[INDEX_VAL] + KEY_ARRAY[INDEX_MOD]) % 256]
+
+                DECRYPT_DATA.append(chr(DECRYPT_BYTE))
+
+            DECRYPT_DATA = ''.join(DECRYPT_DATA)
+
+            if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
+                if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
+                    BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                    print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
+                URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
+                print "\t[!] Detected Hancitor URLs"
+                for i in URLS:
+                    print "\t[-] %s" % i.replace("http", "hxxp")            
+                sys.exit(1)
+            else:
+                print "\t[!] Failed to decrypt phase 2! Shutting down"
+                sys.exit(1)
+else:
+    # Find XOR keys
+    XOR_VALUE = phase2_xorhunt(FILE_NAME)
 
 # Decode payload
 DEC_PAYLOAD = ""
