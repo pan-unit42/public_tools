@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "18JAN2017"
+        date   = "24JAN2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -21,6 +21,7 @@ rule h_dropper : vb_win32api
         hash16 = "e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f"
         hash17 = "c56ff7309ed75a4f416e6116f5a3777e15107811085ba96f7ca7f210d6780c14"
         hash18 = "7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f"
+        hash19 = "50e2d9ad219279f41ffc95b4a81eb20df5ab06059a0417cd4ca3bd892fde3549"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -52,6 +53,7 @@ rule h_dropper : vb_win32api
         $magic_deadface                 = { 44 45 41 44 46 41 43 45 }                                                               // DEADFACE
         $magic_nicework                 = { 4E 49 43 45 57 4F 52 4B }                                                               // NICEWORK
         $magic_murakami                 = { 4D 55 52 41 4B 41 4D 49 }                                                               // MURAKAMI
+        $magic_fairgame                 = { 46 41 49 52 47 41 4D 45 }                                                               // FAIRGAME
         // Shellcode stub
         $magic_stub1                    = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $magic_stub2                    = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2  
