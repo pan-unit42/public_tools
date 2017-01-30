@@ -22,7 +22,7 @@ rule h_dropper : vb_win32api
         hash17 = "c56ff7309ed75a4f416e6116f5a3777e15107811085ba96f7ca7f210d6780c14"
         hash18 = "7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f"
         hash19 = "50e2d9ad219279f41ffc95b4a81eb20df5ab06059a0417cd4ca3bd892fde3549"
-        hash20 =
+        hash20 = "5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
