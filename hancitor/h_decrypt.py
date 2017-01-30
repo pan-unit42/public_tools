@@ -10,7 +10,7 @@ __date__    = "30JAN2017"
 
 # v1.1.2 - 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a
 # New variant of decoder in phase 1
-# Different add value and alternates XOR with 0xF
+# Different add value and alternates XOR each character with 0xF and 0x10
 
 # v1.1.1 - 7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f
 # New variant has encrypted URLs
