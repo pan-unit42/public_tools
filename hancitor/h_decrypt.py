@@ -5,8 +5,12 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.1"
-__date__    = "19JAN2017"
+__version__ = "1.1.2"
+__date__    = "30JAN2017"
+
+# v1.1.2 - 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a
+# New variant of decoder in phase 1
+# Different add value and alternates XOR with 0xF
 
 # v1.1.1 - 7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f
 # New variant has encrypted URLs
@@ -139,6 +143,43 @@ else:
     ADD_VALUE  = "\x03"
     XOR_VALUE  = "\x00" # Seen \x13 and \x10
 
+def phase1_unpack_v2(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
+
+    # Initialize stack
+    mu.mem_map(ADDRESS, 4 * 1024 * 1024)
+
+    # Build shellcode with variables
+    # sub_C52 loc_ED3
+    SC = b'\x90\x89\xE8\x8D\x14\x01\x8A\x02\x04\x05\xF6\xC1\x01\x75\x04\x34\x0F\xEB\x02\x34\x10\x41\x88\x02\x3B\xCE\x72\xE4'
+
+    # Build final code to emulate
+    X86_CODE32 = SC + ENC_PAYLOAD[10:]
+
+    # Write code to memory
+    mu.mem_write(ADDRESS, X86_CODE32)
+    # Start of encoded data + offset to binary
+    mu.reg_write(UC_X86_REG_EBP, 0x100001C)
+    # Initialize ECX counter to 0
+    mu.reg_write(UC_X86_REG_ECX, 0x0)
+    mu.reg_write(UC_X86_REG_ESI, len(ENC_PAYLOAD))
+    # Initialize Stack for functions
+    mu.reg_write(UC_X86_REG_ESP, 0x1300000)
+
+    # Print 150 characters of encrypted value
+    #print "Encrypt: %s" % mu.mem_read(0x100001C,150)
+
+    # Run the code
+    try:
+        mu.emu_start(ADDRESS, ADDRESS + len(X86_CODE32))
+    except UcError as e:
+        pass
+
+    # Print 150 characters of decrypted value
+    #print "Decrypt: %s" % mu.mem_read(0x100001C,150)
+
+    return mu
+
+
 # Converted unpacking to a function to make brute forcing XOR easier
 def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
@@ -229,7 +270,9 @@ def phase1(SIZE_VALUE, XOR_VALUE):
 
     # Brute force XOR key as they are changing more frequently
     while ord(XOR_VALUE) < 255:
+
         mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
+
         if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
             print "\t\t[*] Found XOR key '%s'" % hex(ord(XOR_VALUE))
             SIZE_VALUE = struct.unpack("i", SIZE_VALUE)[0]
@@ -248,8 +291,24 @@ def phase1(SIZE_VALUE, XOR_VALUE):
 
     # Print results
     if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
-        print "\t[!] Failed to decode phase 1! Shutting down"
-        sys.exit(1)
+
+        # Try version 2
+        # 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a New decoding variant
+        try:
+            mu = phase1_unpack_v2(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
+            B64_DATA = mu.mem_read(0x100001C, len(ENC_PAYLOAD))
+            B64_DATA = re.search("[A-Za-z0-9+/]{500,}[=]{1,2}", B64_DATA)
+            DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+            if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+                print "\t[*] Detected Hancitor encoder variant v2, attempting to decode"
+                FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+                FILE_HANDLE = open(FILE_NAME, "w")
+                FILE_HANDLE.write(DEC_PAYLOAD)
+                FILE_HANDLE.close()
+                print "\t[!] Success! Written to disk as %s" % FILE_NAME
+        except:
+            print "\t[!] Failed to decode phase 1! Shutting down"
+            sys.exit(1)
     else:
         if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
             print "\t[-] ADD:  %s\n\t[-] XOR:  %s\n\t[-] SIZE: %s" % (hex(ord(ADD_VALUE)), hex(ord(XOR_VALUE)), SIZE_VALUE)
