@@ -5,8 +5,12 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.2"
-__date__    = "30JAN2017"
+__version__ = "1.1.3"
+__date__    = "31JAN2017"
+
+# v1.1.3 - 5527d778becf75d8ce7f45876a88add06f79577ad7c4cbd1a8f42aa0e9991320
+# Changed phase 1 variant 2 decoder to now brute force values outside of Unicorn
+# Restricted it to 27K possibilities (30^3) for add, xor1, xor2
 
 # v1.1.2 - 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a
 # New variant of decoder in phase 1
@@ -143,43 +147,6 @@ else:
     ADD_VALUE  = "\x03"
     XOR_VALUE  = "\x00" # Seen \x13 and \x10
 
-def phase1_unpack_v2(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
-
-    # Initialize stack
-    mu.mem_map(ADDRESS, 4 * 1024 * 1024)
-
-    # Build shellcode with variables
-    # sub_C52 loc_ED3
-    SC = b'\x90\x89\xE8\x8D\x14\x01\x8A\x02\x04\x05\xF6\xC1\x01\x75\x04\x34\x0F\xEB\x02\x34\x10\x41\x88\x02\x3B\xCE\x72\xE4'
-
-    # Build final code to emulate
-    X86_CODE32 = SC + ENC_PAYLOAD[10:]
-
-    # Write code to memory
-    mu.mem_write(ADDRESS, X86_CODE32)
-    # Start of encoded data + offset to binary
-    mu.reg_write(UC_X86_REG_EBP, 0x100001C)
-    # Initialize ECX counter to 0
-    mu.reg_write(UC_X86_REG_ECX, 0x0)
-    mu.reg_write(UC_X86_REG_ESI, len(ENC_PAYLOAD))
-    # Initialize Stack for functions
-    mu.reg_write(UC_X86_REG_ESP, 0x1300000)
-
-    # Print 150 characters of encrypted value
-    #print "Encrypt: %s" % mu.mem_read(0x100001C,150)
-
-    # Run the code
-    try:
-        mu.emu_start(ADDRESS, ADDRESS + len(X86_CODE32))
-    except UcError as e:
-        pass
-
-    # Print 150 characters of decrypted value
-    #print "Decrypt: %s" % mu.mem_read(0x100001C,150)
-
-    return mu
-
-
 # Converted unpacking to a function to make brute forcing XOR easier
 def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
@@ -224,6 +191,43 @@ def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
     return mu
 
+def phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
+
+    # Leaving partial Unicorn data for preservation
+
+    ## If we have shellcode, find shellcode function (this is to avoid brute forcing 16.7M possible combinations, 0xFF^3 (add/dual xor)
+    ##SC = re.search("\x8B\x45\xF8\x8D\x14\x01\x8A\x02.+\x41\x88\x02\x3B\xCE\x72\xE4", SC_DATA).group(0)
+    ##SC = "\x90\x89\xE8" + SC[3:]
+
+    # Build shellcode with variables
+    # sub_C52 loc_ED3
+    #SC = b'\x90\x89\xE8\x8D\x14\x01\x8A\x02\x04' + chr(ADD_VALUE) + '\xF6\xC1\x01\x75\x04\x34' + chr(XOR_VALUE_1) + '\xEB\x02\x34' + chr(XOR_VALUE_2) + '\x41\x88\x02\x3B\xCE\x72\xE4'
+
+    # Build final code to emulate
+    #X86_CODE32 = SC + ENC_PAYLOAD[10:]
+
+    # The above functions work but emulating this brute-force with Unicorn takes a SIGNFICANT amount of time (15+mins)
+    # Deleted most of the Unicorn part and re-wrote for Python with partial B64 matching to reduce time to <5sec
+    mu = ''
+    count = 0
+    for i in ENC_PAYLOAD[10:LENGTH_VALUE]:
+
+        i = ord(i) + ADD_VALUE
+
+        if count % 2 == 0:
+            i = i ^ XOR_VALUE_1
+        else:
+            i = i ^ XOR_VALUE_2
+
+        try:
+            mu += chr(i)
+        except:
+            continue
+
+        count += 1
+
+    return mu
+
 # Samples without embedded PE Hancitor payloads are encoding URLs to download the payload
 def http_decode(ENC_PAYLOAD):
 
@@ -265,7 +269,7 @@ def http_decode(ENC_PAYLOAD):
     # Return length of decoded payload, parsing will take place later
     return mu.mem_read(0x1000000 + len(SC), len(ENC_PAYLOAD))
 
-def phase1(SIZE_VALUE, XOR_VALUE):
+def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE):
     SIZE_VALUE = struct.pack("i", SIZE_VALUE)
 
     # Brute force XOR key as they are changing more frequently
@@ -294,19 +298,52 @@ def phase1(SIZE_VALUE, XOR_VALUE):
 
         # Try version 2
         # 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a New decoding variant
-        try:
-            mu = phase1_unpack_v2(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
-            B64_DATA = mu.mem_read(0x100001C, len(ENC_PAYLOAD))
-            B64_DATA = re.search("[A-Za-z0-9+/]{500,}[=]{1,2}", B64_DATA)
-            DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
-            if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
-                print "\t[*] Detected Hancitor encoder variant v2, attempting to decode"
-                FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
-                FILE_HANDLE = open(FILE_NAME, "w")
-                FILE_HANDLE.write(DEC_PAYLOAD)
-                FILE_HANDLE.close()
-                print "\t[!] Success! Written to disk as %s" % FILE_NAME
-        except:
+
+        print "\t[!] Unable to find variant 1, attempting variant 2"
+        # Brute force
+        ADD_VALUE  = 0
+        SUCCESS_FLAG = 0
+
+        while ADD_VALUE < 30:
+
+            XOR_VALUE_1 = 0
+
+            while XOR_VALUE_1 < 30:
+
+                XOR_VALUE_2 = 0
+
+                while XOR_VALUE_2 < 30:
+                    try:
+                        B64_DATA = phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, 322)
+                        B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                        DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+                    except:
+                        DEC_PAYLOAD = ''
+                    if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+
+                        print "\t[*] Successfully brute forced Hancitor encoder variant v2"
+                        print "\t[-] ADD:  %s\n\t[-] XOR1: %s\n\t[-] XOR2: %s" % (hex(ADD_VALUE), hex(XOR_VALUE_1), hex(XOR_VALUE_2))
+
+                        B64_DATA = phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
+                        B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                        DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+
+                        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+                        FILE_HANDLE = open(FILE_NAME, "w")
+                        FILE_HANDLE.write(DEC_PAYLOAD)
+                        FILE_HANDLE.close()
+
+                        print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+                        SUCCESS_FLAG = 1
+
+                    XOR_VALUE_2 += 1
+
+                XOR_VALUE_1 += 1
+
+            ADD_VALUE += 1
+
+        if SUCCESS_FLAG == 0:
             print "\t[!] Failed to decode phase 1! Shutting down"
             sys.exit(1)
     else:
@@ -351,7 +388,7 @@ try:
     FILE_HANDLE.close()
     print "\t[!] Success! Written to disk as %s" % FILE_NAME
 except:
-    phase1(SIZE_VALUE, XOR_VALUE)
+    phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE)
 
 ################
 # Second Phase #
