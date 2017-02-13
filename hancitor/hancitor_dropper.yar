@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "30JAN2017"
+        date   = "13FEB2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -23,6 +23,7 @@ rule h_dropper : vb_win32api
         hash18 = "7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f"
         hash19 = "50e2d9ad219279f41ffc95b4a81eb20df5ab06059a0417cd4ca3bd892fde3549"
         hash20 = "5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a"
+        hash21 = "0b8f91277f2161875cfe2f49ef1e499bcb60d1caa677d7d2e96b71437c648e5d"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -44,6 +45,7 @@ rule h_dropper : vb_win32api
         $api_enumcalendarinfo           = { 00 45 6E 75 6D 43 61 6C 65 6E 64 61 72 49 6E 66 6F [0-1] 00 }                           // EnumCalendarInfo?
         $api_enumtimeformats            = { 00 45 6E 75 6D 54 69 6D 65 46 6F 72 6D 61 74 73 57 [0-1] 00 }                           // EnumTimeFormats?
         $api_shccreatethread            = { 00 53 48 43 72 65 61 74 65 54 68 72 65 61 64 00 }                                       // SHCreateThread
+        $api_graystring                 = { 00 47 72 61 79 53 74 72 69 6E 67 [0-1] 00 }                                             // GrayString?
         // Magic headers
         $magic_pola                     = { 50 4F 4C 41 }                                                                           // POLA (also POLAROID)
         $magic_starfall                 = { 53 54 41 52 46 41 4C 4C }                                                               // STARFALL
@@ -56,6 +58,7 @@ rule h_dropper : vb_win32api
         $magic_murakami                 = { 4D 55 52 41 4B 41 4D 49 }                                                               // MURAKAMI
         $magic_fairgame                 = { 46 41 49 52 47 41 4D 45 }                                                               // FAIRGAME
         $magic_comodo                   = { 43 4F 4D 4F 44 4F }                                                                     // COMODO
+        $magic_horror                   = { 48 4F 52 52 4F 52 }                                                                     // HORROR
         // Shellcode stub
         $magic_stub1                    = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $magic_stub2                    = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2  
