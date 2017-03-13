@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "27FEB2017"
+        date   = "13MAR2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -25,6 +25,7 @@ rule h_dropper : vb_win32api
         hash20 = "5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a"
         hash21 = "0b8f91277f2161875cfe2f49ef1e499bcb60d1caa677d7d2e96b71437c648e5d"
         hash22 = "d2d786e373e968858e8a45118b20b744c621e10c84d5bbfddd0ff12841c5442b"
+        hash23 = "800bf028a23440134fc834efc5c1e02cc70f05b2e800bbc285d7c92a4b126b1c"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -47,6 +48,8 @@ rule h_dropper : vb_win32api
         $api_enumtimeformats            = { 00 45 6E 75 6D 54 69 6D 65 46 6F 72 6D 61 74 73 57 [0-1] 00 }                           // EnumTimeFormats?
         $api_shccreatethread            = { 00 53 48 43 72 65 61 74 65 54 68 72 65 61 64 00 }                                       // SHCreateThread
         $api_graystring                 = { 00 47 72 61 79 53 74 72 69 6E 67 [0-1] 00 }                                             // GrayString?
+        $api_createtimerqueuetimer      = { 00 43 72 65 61 74 65 54 69 6D 65 72 51 75 65 75 65 54 69 6D 65 72 00 }                  // CreateTimerQueueTimer
+
         // Magic headers
         $magic_pola                     = { 50 4F 4C 41 }                                                                           // POLA (also POLAROID)
         $magic_starfall                 = { 53 54 41 52 46 41 4C 4C }                                                               // STARFALL
@@ -61,10 +64,10 @@ rule h_dropper : vb_win32api
         $magic_comodo                   = { 43 4F 4D 4F 44 4F }                                                                     // COMODO
         $magic_horror                   = { 48 4F 52 52 4F 52 }                                                                     // HORROR
         $magic_dreams                   = { 44 52 45 41 4D 53 }                                                                     // DREAMS
+        $magic_abhie                    = { 40 41 42 48 49 45 }                                                                     // @ABHIE
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
-
     condition:
         uint32be(0) == 0xD0CF11E0 and filesize < 1MB and 1 of ($stub_*) and 1 of ($alloc_*) and 1 of ($mem_*) and 1 of ($api_*) and 1 of ($magic_*)
 }

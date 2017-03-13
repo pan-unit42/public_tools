@@ -5,8 +5,12 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.3"
-__date__    = "31JAN2017"
+__version__ = "1.1.4"
+__date__    = "13MAR2017"
+
+# v1.1.4 - 800bf028a23440134fc834efc5c1e02cc70f05b2e800bbc285d7c92a4b126b1c
+# Added variant 3 to phase 1 decoder - now doing 4-byte XOR key
+# They have a bug in their code so likely V4 will be along shortly
 
 # v1.1.3 - 5527d778becf75d8ce7f45876a88add06f79577ad7c4cbd1a8f42aa0e9991320
 # Changed phase 1 variant 2 decoder to now brute force values outside of Unicorn
@@ -105,15 +109,15 @@ if SC_DATA != None:
 else:
     print "\t[!] No raw B64 shellcode, going blind"
     # Extract payload from magic header bytes
-    if re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header v1 '%s'" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
-        ENC_PAYLOAD = (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
+    if re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
+        print "\t\t[*] Found magic header v1 '%s'" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
+        ENC_PAYLOAD = (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
     # New magic header
     # e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f
-    elif re.search("\x08\x01\x01\x01\x06.\x00\x7f\xff\xd9[a-zA-Z]+\x08\x00[\x00-\xff]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header v2 \"%s\"" % (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[a-zA-Z]+\x08\x00", FILE_CONTENT).group(0))[8:-2]
-        ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[a-zA-Z]+\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
+    elif re.search("\x08\x01\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
+        print "\t\t[*] Found magic header v2 \"%s\"" % (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
+        ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
     else:
         XOR_VALUE = 0
@@ -191,7 +195,58 @@ def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
     return mu
 
-def phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
+def phase1_unpack_variant2():
+    # Try version 2
+    # 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a New decoding variant
+
+    print "\t[!] Attempting variant 2..."
+
+    # Brute force
+    ADD_VALUE = 0
+    SUCCESS_FLAG = 0
+
+    while ADD_VALUE < 30:
+
+        XOR_VALUE_1 = 0
+
+        while XOR_VALUE_1 < 30:
+
+            XOR_VALUE_2 = 0
+
+            while XOR_VALUE_2 < 30:
+                try:
+                    B64_DATA = phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, 322)
+                    B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+                except:
+                    DEC_PAYLOAD = ''
+                if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+                    print "\t[*] Successfully brute forced Hancitor encoder variant v2"
+                    print "\t[-] ADD:  %s\n\t[-] XOR1: %s\n\t[-] XOR2: %s" % (
+                    hex(ADD_VALUE), hex(XOR_VALUE_1), hex(XOR_VALUE_2))
+
+                    B64_DATA = phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
+                    B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+
+                    FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+                    FILE_HANDLE = open(FILE_NAME, "w")
+                    FILE_HANDLE.write(DEC_PAYLOAD)
+                    FILE_HANDLE.close()
+
+                    print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+                    SUCCESS_FLAG = 1
+
+                XOR_VALUE_2 += 1
+
+            XOR_VALUE_1 += 1
+
+        ADD_VALUE += 1
+
+    return SUCCESS_FLAG
+
+def phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
 
     # Leaving partial Unicorn data for preservation
 
@@ -223,6 +278,52 @@ def phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
             mu += chr(i)
         except:
             continue
+
+        count += 1
+
+    return mu
+
+def phase1_unpack_variant3():
+    # Try version 3
+    # 800bf028a23440134fc834efc5c1e02cc70f05b2e800bbc285d7c92a4b126b1c New decoding variant
+
+    print "\t[!] Attempting variant 3..."
+
+    SUCCESS_FLAG = 0
+
+    XOR_VALUE_1 = "\x78\x50\x34\x3F"
+
+    B64_DATA = phase1_unpack_v3decode(XOR_VALUE_1, 322)
+    B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+
+    if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+        print "\t[*] Successfully brute forced Hancitor encoder variant v3"
+        print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE_1]))
+
+        B64_DATA = phase1_unpack_v3decode(XOR_VALUE_1, len(ENC_PAYLOAD))
+        B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+        DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+
+        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+        FILE_HANDLE = open(FILE_NAME, "w")
+        FILE_HANDLE.write(DEC_PAYLOAD)
+        FILE_HANDLE.close()
+
+        print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+        SUCCESS_FLAG = 1
+
+    return SUCCESS_FLAG
+
+def phase1_unpack_v3decode(XOR_VALUE_1, LENGTH_VALUE):
+
+    mu = ''
+    count = 0
+    l = len(XOR_VALUE_1)
+    for i in range(0, len(ENC_PAYLOAD[10:LENGTH_VALUE])):
+
+        mu += chr(ord(ENC_PAYLOAD[10:LENGTH_VALUE][i]) ^ ord(XOR_VALUE_1[i % l]))
 
         count += 1
 
@@ -296,52 +397,12 @@ def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE):
     # Print results
     if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
 
-        # Try version 2
-        # 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a New decoding variant
+        # Try variant 2
+        SUCCESS_FLAG = phase1_unpack_variant2()
 
-        print "\t[!] Unable to find variant 1, attempting variant 2"
-        # Brute force
-        ADD_VALUE  = 0
-        SUCCESS_FLAG = 0
-
-        while ADD_VALUE < 30:
-
-            XOR_VALUE_1 = 0
-
-            while XOR_VALUE_1 < 30:
-
-                XOR_VALUE_2 = 0
-
-                while XOR_VALUE_2 < 30:
-                    try:
-                        B64_DATA = phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, 322)
-                        B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
-                        DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
-                    except:
-                        DEC_PAYLOAD = ''
-                    if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
-
-                        print "\t[*] Successfully brute forced Hancitor encoder variant v2"
-                        print "\t[-] ADD:  %s\n\t[-] XOR1: %s\n\t[-] XOR2: %s" % (hex(ADD_VALUE), hex(XOR_VALUE_1), hex(XOR_VALUE_2))
-
-                        B64_DATA = phase1_unpack_v2(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
-                        B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
-                        DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
-
-                        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
-                        FILE_HANDLE = open(FILE_NAME, "w")
-                        FILE_HANDLE.write(DEC_PAYLOAD)
-                        FILE_HANDLE.close()
-
-                        print "\t[!] Success! Written to disk as %s" % FILE_NAME
-
-                        SUCCESS_FLAG = 1
-
-                    XOR_VALUE_2 += 1
-
-                XOR_VALUE_1 += 1
-
-            ADD_VALUE += 1
+        # Try variant 3
+        if SUCCESS_FLAG == 0:
+            SUCCESS_FLAG = phase1_unpack_variant3()
 
         if SUCCESS_FLAG == 0:
             print "\t[!] Failed to decode phase 1! Shutting down"
