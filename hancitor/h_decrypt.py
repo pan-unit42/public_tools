@@ -291,28 +291,33 @@ def phase1_unpack_variant3():
 
     SUCCESS_FLAG = 0
 
-    XOR_VALUE_1 = "\x78\x50\x34\x3F"
+    # Don't have the shellcode or a way to brute force the key, so will need to manually add them here for the time being
+    XOR_KEYS = ["\x78\x50\x34\x3F", "\x78\x53\x38\x35"]
 
-    B64_DATA = phase1_unpack_v3decode(XOR_VALUE_1, 322)
-    B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
-    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+    for XOR_VALUE in XOR_KEYS:
+        if SUCCESS_FLAG == 0:
+            try:
+                B64_DATA = phase1_unpack_v3decode(XOR_VALUE, 322)
+                B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+                if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+                    print "\t[*] Successfully brute forced Hancitor encoder variant v3"
+                    print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE]))
 
-    if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
-        print "\t[*] Successfully brute forced Hancitor encoder variant v3"
-        print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE_1]))
+                    B64_DATA = phase1_unpack_v3decode(XOR_VALUE, len(ENC_PAYLOAD))
+                    B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
 
-        B64_DATA = phase1_unpack_v3decode(XOR_VALUE_1, len(ENC_PAYLOAD))
-        B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
-        DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+                    FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+                    FILE_HANDLE = open(FILE_NAME, "w")
+                    FILE_HANDLE.write(DEC_PAYLOAD)
+                    FILE_HANDLE.close()
 
-        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
-        FILE_HANDLE = open(FILE_NAME, "w")
-        FILE_HANDLE.write(DEC_PAYLOAD)
-        FILE_HANDLE.close()
+                    print "\t[!] Success! Written to disk as %s" % FILE_NAME
 
-        print "\t[!] Success! Written to disk as %s" % FILE_NAME
-
-        SUCCESS_FLAG = 1
+                    SUCCESS_FLAG = 1
+            except:
+                pass
 
     return SUCCESS_FLAG
 
