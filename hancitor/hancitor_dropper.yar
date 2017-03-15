@@ -65,8 +65,8 @@ rule h_dropper : vb_win32api
         $magic_comodo                   = { 43 4F 4D 4F 44 4F }                                                                     // COMODO
         $magic_horror                   = { 48 4F 52 52 4F 52 }                                                                     // HORROR
         $magic_dreams                   = { 44 52 45 41 4D 53 }                                                                     // DREAMS
-        $magic_abhie                    = { 40 41 42 48 49 45 }                                                                     // @ABHIE
-        $magic_abhie                    = { 21 41 42 48 49 45 }                                                                     // !ABHIE
+        $magic_at_abhie                 = { 40 41 42 48 49 45 }                                                                     // @ABHIE
+        $magic_bang_abhie               = { 21 41 42 48 49 45 }                                                                     // !ABHIE
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
