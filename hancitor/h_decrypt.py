@@ -364,7 +364,8 @@ def phase1_unpack_variant4():
                 DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
                 if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
                     print "\t[*] Successfully decoded Hancitor with variant v4"
-                    print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE]))
+                    print "\t[-] XOR1: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE_1]))
+                    print "\t[-] XOR2: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE_2]))
 
                     B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
                     B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
