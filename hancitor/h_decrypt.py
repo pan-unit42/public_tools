@@ -5,8 +5,12 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.4"
-__date__    = "13MAR2017"
+__version__ = "1.1.5"
+__date__    = "15MAR2017"
+
+# v1.1.5 - 62e6e5dc0c3927a8c5d708688ca2b56df93848b15a4c38aab173c5a8384395f9
+# Added variant 4 to phase 1 decoder - now doing alternating 4-byte XOR keys
+# They fixed variant 3 so it now alternates correctly. Key-pairs will need to be added manually.
 
 # v1.1.4 - 800bf028a23440134fc834efc5c1e02cc70f05b2e800bbc285d7c92a4b126b1c
 # Added variant 3 to phase 1 decoder - now doing 4-byte XOR key
@@ -292,7 +296,11 @@ def phase1_unpack_variant3():
     SUCCESS_FLAG = 0
 
     # Don't have the shellcode or a way to brute force the key, so will need to manually add them here for the time being
-    XOR_KEYS = ["\x78\x50\x34\x3F", "\x78\x53\x38\x35"]
+    # Insert new xor keys below -- NOTE: this variant will probably never be used again as it was a broken version of variant 4
+    XOR_KEYS = [
+        "\x78\x50\x34\x3F",
+        "\x78\x53\x38\x35"
+    ]
 
     for XOR_VALUE in XOR_KEYS:
         if SUCCESS_FLAG == 0:
@@ -301,7 +309,7 @@ def phase1_unpack_variant3():
                 B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
                 DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
                 if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
-                    print "\t[*] Successfully brute forced Hancitor encoder variant v3"
+                    print "\t[*] Successfully decoded Hancitor with variant v3"
                     print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE]))
 
                     B64_DATA = phase1_unpack_v3decode(XOR_VALUE, len(ENC_PAYLOAD))
@@ -324,11 +332,72 @@ def phase1_unpack_variant3():
 def phase1_unpack_v3decode(XOR_VALUE_1, LENGTH_VALUE):
 
     mu = ''
-    count = 0
+
     l = len(XOR_VALUE_1)
     for i in range(0, len(ENC_PAYLOAD[10:LENGTH_VALUE])):
 
         mu += chr(ord(ENC_PAYLOAD[10:LENGTH_VALUE][i]) ^ ord(XOR_VALUE_1[i % l]))
+
+    return mu
+
+def phase1_unpack_variant4():
+    # Try version 4
+    # 62e6e5dc0c3927a8c5d708688ca2b56df93848b15a4c38aab173c5a8384395f9 New decoding variant
+
+    print "\t[!] Attempting variant 4..."
+
+    SUCCESS_FLAG = 0
+
+    # Don't have the shellcode or a way to brute force the key, so will need to manually add them here for the time being
+    # Insert new xor-pairs below
+    XOR_PAIRS = {
+        "\x78\x53\x38\x35":"\xC9\xA1\x43\x24"
+    }
+
+    for XOR_PAIR in XOR_PAIRS:
+        if SUCCESS_FLAG == 0:
+            try:
+                XOR_VALUE_1 = XOR_PAIR
+                XOR_VALUE_2 = XOR_PAIRS[XOR_PAIR]
+                B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, 322)
+                B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+                if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
+                    print "\t[*] Successfully decoded Hancitor with variant v4"
+                    print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE]))
+
+                    B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
+                    B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
+                    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+
+                    FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+                    FILE_HANDLE = open(FILE_NAME, "w")
+                    FILE_HANDLE.write(DEC_PAYLOAD)
+                    FILE_HANDLE.close()
+
+                    print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+                    SUCCESS_FLAG = 1
+            except:
+                pass
+
+    return SUCCESS_FLAG
+
+def phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
+
+    mu = ''
+    count = 0
+    for i in range(10, len(ENC_PAYLOAD[10:LENGTH_VALUE]), 4):
+
+        if count % 2 == 0:
+            l = len(XOR_VALUE_1)
+            for index,value in enumerate(range(i, i+4)):
+                mu += chr(ord(ENC_PAYLOAD[value]) ^ ord(XOR_VALUE_1[index]))
+
+        else:
+            l = len(XOR_VALUE_2)
+            for index,value in enumerate(range(i, i+4)):
+                mu += chr(ord(ENC_PAYLOAD[value]) ^ ord(XOR_VALUE_2[index]))
 
         count += 1
 
@@ -408,6 +477,10 @@ def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE):
         # Try variant 3
         if SUCCESS_FLAG == 0:
             SUCCESS_FLAG = phase1_unpack_variant3()
+
+        # Try variant 4
+        if SUCCESS_FLAG == 0:
+            SUCCESS_FLAG = phase1_unpack_variant4()
 
         if SUCCESS_FLAG == 0:
             print "\t[!] Failed to decode phase 1! Shutting down"
