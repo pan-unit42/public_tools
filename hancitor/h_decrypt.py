@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.5"
-__date__    = "15MAR2017"
+__version__ = "1.1.6"
+__date__    = "30MAY2017"
+
+# v1.1.6
+# Newer versions of Unicorn Engine (1.0.0+) changed memory management so I needed to adjust some areas to re-init the memory sections each loop
 
 # v1.1.5 - 62e6e5dc0c3927a8c5d708688ca2b56df93848b15a4c38aab173c5a8384395f9
 # Added variant 4 to phase 1 decoder - now doing alternating 4-byte XOR keys
@@ -157,6 +160,9 @@ else:
 
 # Converted unpacking to a function to make brute forcing XOR easier
 def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
+
+    ADDRESS = 0x1000000
+    mu = Uc(UC_ARCH_X86, UC_MODE_32)
 
     # Initialize stack
     mu.mem_map(ADDRESS, 4 * 1024 * 1024)
@@ -407,6 +413,9 @@ def phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
 # Samples without embedded PE Hancitor payloads are encoding URLs to download the payload
 def http_decode(ENC_PAYLOAD):
 
+    ADDRESS = 0x1000000
+    mu = Uc(UC_ARCH_X86, UC_MODE_32)
+
     # Initialize stack
     mu.mem_map(ADDRESS, 4 * 1024 * 1024)
 
@@ -557,6 +566,9 @@ def phase2_xorhunt(FILE_NAME):
 
 def phase2_unpack(XOR_VALUE):
 
+    ADDRESS = 0x1000000
+    mu = Uc(UC_ARCH_X86, UC_MODE_32)
+
     # Initialize stack
     mu.mem_map(ADDRESS, 4 * 1024 * 1024)
 
@@ -692,7 +704,7 @@ else:
     # Write file to disk
     FILE_NAME = sys.argv[1].split(".")[0] + "_S2.exe"
     FILE_HANDLE = open(FILE_NAME, "w")
-    FILE_HANDLE.write(mu.mem_read(0x1000040, 0x5000))
+    FILE_HANDLE.write(DEC_PAYLOAD)
     FILE_HANDLE.close()
     print "\t[!] Success! Written to disk as %s" % FILE_NAME
 
