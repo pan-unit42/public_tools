@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "01JUN2017"
+        date   = "06JUN2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -39,6 +39,7 @@ rule h_dropper : vb_win32api
         hash34 = "7444a4f4df22f5d5e0796e8eafb034a1b6b6f7e5d5a5cddf8fb5362624a4b5c7"
         hash35 = "90bc91b499514874902cd442324f1f81347ed351dd60212c3ac238f419f755f4"
         hash36 = "6e73879ca49b40974cce575626e31541b49c07daa12ec2e9765c432bfac07a20"
+        hash37 = "fba0c13176f30040d6c78bb426ddaa5dd01afc45abb9b0ada8807f408167ca97"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -91,6 +92,7 @@ rule h_dropper : vb_win32api
         $magic_bang_piter               = { 21 50 49 54 45 52 }                                                                     // !PITER
         $magic_bang_dgfrt               = { 21 44 47 46 52 54 }                                                                     // !DGFRT
         $magic_bang_yssus               = { 21 59 53 53 55 53 }                                                                     // !YSSUS
+        $magic_bang_miden               = { 21 4D 49 44 45 4E }                                                                     // !MIDEN
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
