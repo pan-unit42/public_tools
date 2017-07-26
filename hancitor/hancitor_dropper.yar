@@ -52,6 +52,7 @@ rule h_dropper : vb_win32api
         hash47 = "0b400fa86c592d6c4fa1bca00ffb4740fe38e7ae5595c344d7bb17299291de7a"
         hash48 = "9ec2118695da118a244484c0c5ebc8aeff804e7b4709962bf107ec49b388572b"
         hash49 = "b46b9b2cc975db3767507fe9c5a464652f3b01d9ece5f0da15d0a58a607fcd24"
+        hash50 = "6c14dd86e0f7f18980781922b26b986f9ddf31b15b6b0bbdf58e7e57d963aec1"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -117,6 +118,7 @@ rule h_dropper : vb_win32api
         $magic_bang_zerts               = { 21 5A 45 52 54 53 }                                                                     // !ZERTS
         $magic_bang_oposs               = { 21 4F 50 4F 53 53 }                                                                     // !OPOSS
         $magic_bang_fpsmn               = { 21 46 50 53 4D 4E }                                                                     // !FPSMN
+        $magic_bang_lmnfs               = { 21 4C 4D 4E 46 53 }                                                                     // !LMNFS
         }
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
