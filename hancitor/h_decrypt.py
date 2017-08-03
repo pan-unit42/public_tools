@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.6"
-__date__    = "30MAY2017"
+__version__ = "1.1.7"
+__date__    = "03AUG2017"
+
+# v1.1.7 - efe7cfe0c08265e1a4eed68a1e544ba0e98fff98942e0e55941e1899aba71579
+# Latest versions Base64 buffer is longer than what is decoded so caused padding issue. Adjusted to account.
 
 # v1.1.6
 # Newer versions of Unicorn Engine (1.0.0+) changed memory management so I needed to adjust some areas to re-init the memory sections each loop
@@ -375,7 +378,15 @@ def phase1_unpack_variant4():
 
                     B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
                     B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
-                    DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
+
+                    # efe7cfe0c08265e1a4eed68a1e544ba0e98fff98942e0e55941e1899aba71579
+                    # Their B64 buffers now extend beyond what they actually decode, which cause padding issue
+                    B64_DATA = B64_DATA.group()
+                    B64_LEN = len(B64_DATA)
+
+                    while B64_LEN % 4 != 0:
+                        B64_LEN -= 1
+                    DEC_PAYLOAD = base64.b64decode(B64_DATA[0:B64_LEN])
 
                     FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
                     FILE_HANDLE = open(FILE_NAME, "w")
