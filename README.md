@@ -4,6 +4,4 @@
 
 Listing of tools released by Palo Alto Networks Threat Intelligence team.
 
-## NetWiredRC Decoder
-Tool to decrypt traffic using the netwire protocol.
 
