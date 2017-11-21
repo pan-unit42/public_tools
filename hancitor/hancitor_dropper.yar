@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "15NOV2017"
+        date   = "21NOV2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -75,6 +75,7 @@ rule h_dropper : vb_win32api
         hash70 = "106fcd233b12b9e79dc6b87b62f28005f45baba2a4c460d6fc1a82fbdf8f3b45"
         hash71 = "8cc391596b990ed945280be44b1372b399b58287d31ab751aac0bf27d9c139b6"
         hash72 = "42da997df77d59d9375273e0cb8f5c4d4d39cc4845ec9f6cabc5180fcf3fdf72"
+        hash73 = "5d3651d7ee057156eabf329b198a46c19a51212ed034cc649a2edb6f3822ef13"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -163,6 +164,7 @@ rule h_dropper : vb_win32api
         $magic_bang_titto               = { 21 54 49 54 54 4F }                                                                     // !TITTO
         $magic_hash_mwpeo               = { 23 4D 57 50 45 4F }                                                                     // #MWPEO
         $magic_hash_kmdyr               = { 23 6B 6D 64 79 72 }                                                                     // #kmdyr
+        $magic_tick_kjhgf               = { 60 4B 4A 48 47 46 }                                                                     // `KJHGF
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
