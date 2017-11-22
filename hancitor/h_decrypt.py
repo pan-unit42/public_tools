@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.7"
-__date__    = "03AUG2017"
+__version__ = "1.1.8"
+__date__    = "22NOV2017"
+
+# v1.1.8 - 5d3651d7ee057156eabf329b198a46c19a51212ed034cc649a2edb6f3822ef13
+# Hancitor build version can contains also letters now
 
 # v1.1.7 - efe7cfe0c08265e1a4eed68a1e544ba0e98fff98942e0e55941e1899aba71579
 # Latest versions Base64 buffer is longer than what is decoded so caused padding issue. Adjusted to account.
@@ -679,8 +682,8 @@ if re.search("api.ipify.org", FILE_CONTENT) and re.search("CryptDecrypt", FILE_C
             DECRYPT_DATA = ''.join(DECRYPT_DATA)
 
             if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
-                if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
-                    BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                if re.search("^[a-z0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
+                    BUILD_NUMBER = re.search("^[a-z0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                     print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
                 URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                 print "\t[!] Detected Hancitor URLs"
