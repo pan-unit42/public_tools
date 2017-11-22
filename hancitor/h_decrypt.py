@@ -682,8 +682,8 @@ if re.search("api.ipify.org", FILE_CONTENT) and re.search("CryptDecrypt", FILE_C
             DECRYPT_DATA = ''.join(DECRYPT_DATA)
 
             if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
-                if re.search("^[a-z0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
-                    BUILD_NUMBER = re.search("^[a-z0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                if re.search("^[\w\d]+\x00\x00\x00\x00", DECRYPT_DATA):
+                    BUILD_NUMBER = re.search("^[\w\d]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                     print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
                 URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                 print "\t[!] Detected Hancitor URLs"
