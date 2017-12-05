@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "28NOV2017"
+        date   = "05DEC2017"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -78,6 +78,7 @@ rule h_dropper : vb_win32api
         hash73 = "5d3651d7ee057156eabf329b198a46c19a51212ed034cc649a2edb6f3822ef13"
         hash74 = "291fc089688d7b6dff031022298d1b939746f3d6dafbb5a419f2a2bbc29f614d"
         hash75 = "075a45a6dce497ef689c3211ebc3e84f9de6fd1027ec80c7653cc60fcc1d3275"
+        hash75 = "4de77bbfd848a3d8f858994d817c4b6f9a40638316cacc4768e9cff892017997"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -169,6 +170,7 @@ rule h_dropper : vb_win32api
         $magic_tick_kjhgf               = { 60 4B 4A 48 47 46 }                                                                     // `KJHGF
         $magic_tick_kjhgr               = { 60 4B 4A 48 47 52 }                                                                     // `KJHGR
         $magic_tick_tjfgr               = { 60 54 4A 46 47 52 }                                                                     // `TJFGR
+        $magic_brak_ygsem               = { 5B 59 47 53 45 4D }                                                                     // [YGSEM
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
