@@ -6,10 +6,10 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
 __version__ = "1.1.8"
-__date__    = "22NOV2017"
+__date__    = "16JAN2018"
 
-# v1.1.8 - 5d3651d7ee057156eabf329b198a46c19a51212ed034cc649a2edb6f3822ef13
-# Hancitor build version can contains also letters now
+# v1.1.8 - 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
+# Added new variant stub and ability to adjust offset for B64 decoding.
 
 # v1.1.7 - efe7cfe0c08265e1a4eed68a1e544ba0e98fff98942e0e55941e1899aba71579
 # Latest versions Base64 buffer is longer than what is decoded so caused padding issue. Adjusted to account.
@@ -131,6 +131,10 @@ else:
     elif re.search("\x08\x01\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
         print "\t\t[*] Found magic header v2 \"%s\"" % (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
         ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
+        SIZE_VALUE = len(ENC_PAYLOAD) - 128
+    elif re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
+        print "\t\t[*] Found magic header v3 \"%s\"" % (re.search("\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
+        ENC_PAYLOAD = (re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
     else:
         XOR_VALUE = 0
@@ -408,7 +412,18 @@ def phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
 
     mu = ''
     count = 0
-    for i in range(10, len(ENC_PAYLOAD[10:LENGTH_VALUE]), 4):
+
+    # 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
+    # Later variants began 2 bytes in after the usual payload start
+    # This will try to determine the start position by expected B64 start
+    start_value = 0
+    for i in range(0,10):
+
+        if chr(ord(ENC_PAYLOAD[10+i]) ^ ord(XOR_VALUE_1[0])) == "T":
+
+            start_value = i
+
+    for i in range(10 + start_value, len(ENC_PAYLOAD[10 + start_value:LENGTH_VALUE]), 4):
 
         if count % 2 == 0:
             l = len(XOR_VALUE_1)
@@ -682,8 +697,8 @@ if re.search("api.ipify.org", FILE_CONTENT) and re.search("CryptDecrypt", FILE_C
             DECRYPT_DATA = ''.join(DECRYPT_DATA)
 
             if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
-                if re.search("^[\w\d]+\x00\x00\x00\x00", DECRYPT_DATA):
-                    BUILD_NUMBER = re.search("^[\w\d]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
+                    BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                     print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
                 URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                 print "\t[!] Detected Hancitor URLs"
