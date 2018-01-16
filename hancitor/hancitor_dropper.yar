@@ -2,7 +2,7 @@ rule h_dropper : vb_win32api
 {
     meta:
         author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "21DEC2017"
+        date   = "16JAN2018"
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -81,6 +81,7 @@ rule h_dropper : vb_win32api
         hash75 = "4de77bbfd848a3d8f858994d817c4b6f9a40638316cacc4768e9cff892017997"
         hash76 = "373da1b6a95ba6e9d6efe7b57d5877d914ffa394ed6e74576f4283a9388d3c79"
         hash77 = "9906d7cbd7675f3334ef91e3a63792180e149b07a5899b1e2f9be5dcc6e8a086"
+        hash78 = "85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909"
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -175,9 +176,11 @@ rule h_dropper : vb_win32api
         $magic_brak_ygsem               = { 5B 59 47 53 45 4D }                                                                     // [YGSEM
         $magic_brak_bitls               = { 5B 42 49 54 4C 53 }                                                                     // [BITLS
         $magic_bang_holid               = { 21 48 4F 4C 49 44 }                                                                     // !HOLID
+        $magic_bang_kfrty               = { 21 4B 46 52 54 59 }                                                                     // !KFRTY
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
+        $stub_v3                        = { 01 00 40 10 04 07 FF D9 [4-8] 08 00 }                                                   // Stub v3
     condition:
         uint32be(0) == 0xD0CF11E0 and filesize < 1MB and 1 of ($stub_*) and 1 of ($alloc_*) and 1 of ($mem_*) and 1 of ($api_*) and 1 of ($magic_*)
 }
