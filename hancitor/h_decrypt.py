@@ -132,6 +132,8 @@ else:
         print "\t\t[*] Found magic header v2 \"%s\"" % (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
         ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
         SIZE_VALUE = len(ENC_PAYLOAD) - 128
+    # New magic header
+    # 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
     elif re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
         print "\t\t[*] Found magic header v3 \"%s\"" % (re.search("\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
         ENC_PAYLOAD = (re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
