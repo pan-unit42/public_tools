@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.8"
-__date__    = "16JAN2018"
+__version__ = "1.1.9"
+__date__    = "24JAN2018"
+
+# v1.1.9 - 6dcbf652b96a7aea16d0c2e72186173d9345f722c9592e62820bcfe477b2b297
+# Added functionality to strip URL from new RTF variant of Hancitor
 
 # v1.1.8 - 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
 # Added new variant stub and ability to adjust offset for B64 decoding.
@@ -92,12 +95,31 @@ mu = Uc(UC_ARCH_X86, UC_MODE_32)
 
 print "[+] FILE: %s\n\t#### PHASE 1 ####" % sys.argv[1]
 
-# Open Word Document and copy data
+# Open document and copy data
 FILE_HANDLE = open(sys.argv[1], "r")
 FILE_CONTENT = ""
 for i in FILE_HANDLE:
     FILE_CONTENT += i
 FILE_HANDLE.close()
+
+# Quick check for RTF and URLs
+# 6dcbf652b96a7aea16d0c2e72186173d9345f722c9592e62820bcfe477b2b297
+if re.search("objdata", FILE_CONTENT, re.IGNORECASE) \
+        and re.search("objclass", FILE_CONTENT, re.IGNORECASE) \
+        and re.search("objupdate", FILE_CONTENT, re.IGNORECASE):
+    print "\t[!] Found RTF Variant"
+    URLS = []
+    for HEX_STRING in re.findall("[a-fA-F0-9]{2000,}", FILE_CONTENT):
+        for url in re.findall("\'http.+?\'", HEX_STRING.decode("hex")):
+            if url[1:-1] not in URLS:
+                URLS.append(url[1:-1])
+
+    if URLS != []:
+        print "\t[!] Extracted URLs"
+        for url in URLS:
+            print "\t[-] %s" % url.replace("http", "hxxp")
+
+    sys.exit(1)
 
 # Pull out base64 encoded shellcode
 # Adjusted to try and account for catastrophic backtracking
