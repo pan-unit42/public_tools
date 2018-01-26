@@ -89,111 +89,8 @@ __date__    = "24JAN2018"
 ADDRESS = 0x1000000
 mu = Uc(UC_ARCH_X86, UC_MODE_32)
 
-###############
-# First Phase #
-###############
-
-print "[+] FILE: %s\n\t#### PHASE 1 ####" % sys.argv[1]
-
-# Open document and copy data
-FILE_HANDLE = open(sys.argv[1], "r")
-FILE_CONTENT = ""
-for i in FILE_HANDLE:
-    FILE_CONTENT += i
-FILE_HANDLE.close()
-
-# Quick check for RTF and URLs
-# 6dcbf652b96a7aea16d0c2e72186173d9345f722c9592e62820bcfe477b2b297
-if re.search("objdata", FILE_CONTENT, re.IGNORECASE) \
-        and re.search("objclass", FILE_CONTENT, re.IGNORECASE) \
-        and re.search("objupdate", FILE_CONTENT, re.IGNORECASE):
-    print "\t[!] Found RTF Variant"
-    URLS = []
-    for HEX_STRING in re.findall("[a-fA-F0-9]{2000,}", FILE_CONTENT):
-        for url in re.findall("\'http.+?\'", HEX_STRING.decode("hex")):
-            if url[1:-1] not in URLS:
-                URLS.append(url[1:-1])
-
-    if URLS != []:
-        print "\t[!] Extracted URLs"
-        for url in URLS:
-            print "\t[-] %s" % url.replace("http", "hxxp")
-
-    sys.exit(1)
-
-# Pull out base64 encoded shellcode
-# Adjusted to try and account for catastrophic backtracking
-SC_DATA = re.search("\00[A-Za-z0-9+/]{3000,}[=]{1,2}\00", FILE_CONTENT)
-if SC_DATA != None:
-    SC_DATA = SC_DATA.group()
-    SC_DATA = base64.b64decode(SC_DATA)
-
-# Extract data depending on version of dropper variables
-if SC_DATA != None:
-    print "\t[-] Found B64 shellcode"
-    # Pull from shellcode
-    INIT_VALUES = re.search("\x8A\x04\x0F\x04.\x34.\x88\x04\x0F\x41\x81\xF9....", SC_DATA).group(0)
-    ADD_VALUE = INIT_VALUES[4]
-    XOR_VALUE  = INIT_VALUES[6]
-    SIZE_VALUE = INIT_VALUES[13:]
-    # Extract payload base on shellcode data
-    MAGIC_OFFSET = re.search("\x50\x4F\x4C\x41", FILE_CONTENT)
-    MAGIC_OFFSET = MAGIC_OFFSET.start()
-    SIZE_VALUE = struct.unpack("<L", SIZE_VALUE)[0]
-    ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + SIZE_VALUE]
-else:
-    print "\t[!] No raw B64 shellcode, going blind"
-    # Extract payload from magic header bytes
-    if re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header v1 '%s'" % (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
-        ENC_PAYLOAD = (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
-        SIZE_VALUE = len(ENC_PAYLOAD) - 128
-    # New magic header
-    # e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f
-    elif re.search("\x08\x01\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header v2 \"%s\"" % (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
-        ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
-        SIZE_VALUE = len(ENC_PAYLOAD) - 128
-    # New magic header
-    # 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
-    elif re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
-        print "\t\t[*] Found magic header v3 \"%s\"" % (re.search("\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
-        ENC_PAYLOAD = (re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT).group(0))[8:]
-        SIZE_VALUE = len(ENC_PAYLOAD) - 128
-    else:
-        XOR_VALUE = 0
-        print "\t[!] Magic header not found!"
-        try:
-            ENC_PAYLOAD = list([x.start() for x in re.finditer("\xFF{400}", FILE_CONTENT)])[-1]
-            while XOR_VALUE < 16:
-                DEC_PAYLOAD = ""
-                # We don't know end of binary so we scrape all and regex B64 out
-                for i in FILE_CONTENT[ENC_PAYLOAD:]:
-                    if (ord(i) + 3) ^ 12 < 255:
-                        DEC_PAYLOAD += chr((ord(i) + 3) ^ XOR_VALUE)
-                B64_PE = re.search("[A-Za-z0-9+/]{3000,}[=]{1,2}", DEC_PAYLOAD)
-                if B64_PE != None:
-                    try:
-                        B64_PE = B64_PE.group()
-                        B64_PE = base64.b64decode(B64_PE)
-                        if "This program cannot be run in DOS mode" in B64_PE:
-                            print "\t[-] Attempting to find encoded binary"
-                            print "\t\t[*] Found XOR key '%s' " % hex(XOR_VALUE)
-                            break
-                    except:
-                        continue
-                XOR_VALUE += 1
-            if XOR_VALUE == 16:
-                sys.exit(1)
-        except:
-            print "\t[!] Unable to process %s" % sys.argv[1]
-            sys.exit(1)
-    # Phase1 most common variables
-    ADD_VALUE  = "\x03"
-    XOR_VALUE  = "\x00" # Seen \x13 and \x10
-
 # Converted unpacking to a function to make brute forcing XOR easier
-def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
+def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE, ENC_PAYLOAD):
 
     ADDRESS = 0x1000000
     mu = Uc(UC_ARCH_X86, UC_MODE_32)
@@ -239,7 +136,7 @@ def phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE):
 
     return mu
 
-def phase1_unpack_variant2():
+def phase1_unpack_variant2(ENC_PAYLOAD):
     # Try version 2
     # 5a3c843bfcf31c2f2f2a2e4d5f5967800a2474e07323e8baa46ff3ac64d60d4a New decoding variant
 
@@ -259,7 +156,7 @@ def phase1_unpack_variant2():
 
             while XOR_VALUE_2 < 30:
                 try:
-                    B64_DATA = phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, 322)
+                    B64_DATA = phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, 322, ENC_PAYLOAD)
                     B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
                     DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
                 except:
@@ -269,7 +166,7 @@ def phase1_unpack_variant2():
                     print "\t[-] ADD:  %s\n\t[-] XOR1: %s\n\t[-] XOR2: %s" % (
                     hex(ADD_VALUE), hex(XOR_VALUE_1), hex(XOR_VALUE_2))
 
-                    B64_DATA = phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
+                    B64_DATA = phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD), ENC_PAYLOAD)
                     B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
                     DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
 
@@ -290,7 +187,7 @@ def phase1_unpack_variant2():
 
     return SUCCESS_FLAG
 
-def phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
+def phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE, ENC_PAYLOAD):
 
     # Leaving partial Unicorn data for preservation
 
@@ -327,7 +224,7 @@ def phase1_unpack_v2decode(ADD_VALUE, XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
 
     return mu
 
-def phase1_unpack_variant3():
+def phase1_unpack_variant3(ENC_PAYLOAD):
     # Try version 3
     # 800bf028a23440134fc834efc5c1e02cc70f05b2e800bbc285d7c92a4b126b1c New decoding variant
 
@@ -345,14 +242,14 @@ def phase1_unpack_variant3():
     for XOR_VALUE in XOR_KEYS:
         if SUCCESS_FLAG == 0:
             try:
-                B64_DATA = phase1_unpack_v3decode(XOR_VALUE, 322)
+                B64_DATA = phase1_unpack_v3decode(XOR_VALUE, 322, ENC_PAYLOAD)
                 B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
                 DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
                 if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
                     print "\t[*] Successfully decoded Hancitor with variant v3"
                     print "\t[-] XOR: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE]))
 
-                    B64_DATA = phase1_unpack_v3decode(XOR_VALUE, len(ENC_PAYLOAD))
+                    B64_DATA = phase1_unpack_v3decode(XOR_VALUE, len(ENC_PAYLOAD), ENC_PAYLOAD)
                     B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
                     DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
 
@@ -369,7 +266,7 @@ def phase1_unpack_variant3():
 
     return SUCCESS_FLAG
 
-def phase1_unpack_v3decode(XOR_VALUE_1, LENGTH_VALUE):
+def phase1_unpack_v3decode(XOR_VALUE_1, LENGTH_VALUE, ENC_PAYLOAD):
 
     mu = ''
 
@@ -380,7 +277,7 @@ def phase1_unpack_v3decode(XOR_VALUE_1, LENGTH_VALUE):
 
     return mu
 
-def phase1_unpack_variant4():
+def phase1_unpack_variant4(ENC_PAYLOAD):
     # Try version 4
     # 62e6e5dc0c3927a8c5d708688ca2b56df93848b15a4c38aab173c5a8384395f9 New decoding variant
 
@@ -399,7 +296,7 @@ def phase1_unpack_variant4():
             try:
                 XOR_VALUE_1 = XOR_PAIR
                 XOR_VALUE_2 = XOR_PAIRS[XOR_PAIR]
-                B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, 322)
+                B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, 322, ENC_PAYLOAD)
                 B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
                 DEC_PAYLOAD = base64.b64decode(B64_DATA.group())
                 if "This program cannot be run in DOS mode" in DEC_PAYLOAD:
@@ -407,7 +304,7 @@ def phase1_unpack_variant4():
                     print "\t[-] XOR1: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE_1]))
                     print "\t[-] XOR2: 0x%s" % ("".join([hex(ord(i))[2:] for i in XOR_VALUE_2]))
 
-                    B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD))
+                    B64_DATA = phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, len(ENC_PAYLOAD), ENC_PAYLOAD)
                     B64_DATA = re.search("[A-Za-z0-9+/=]{300,}", B64_DATA)
 
                     # efe7cfe0c08265e1a4eed68a1e544ba0e98fff98942e0e55941e1899aba71579
@@ -432,7 +329,7 @@ def phase1_unpack_variant4():
 
     return SUCCESS_FLAG
 
-def phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE):
+def phase1_unpack_v4decode(XOR_VALUE_1, XOR_VALUE_2, LENGTH_VALUE, ENC_PAYLOAD):
 
     mu = ''
     count = 0
@@ -507,13 +404,13 @@ def http_decode(ENC_PAYLOAD):
     # Return length of decoded payload, parsing will take place later
     return mu.mem_read(0x1000000 + len(SC), len(ENC_PAYLOAD))
 
-def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE):
+def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE, ENC_PAYLOAD):
     SIZE_VALUE = struct.pack("i", SIZE_VALUE)
 
     # Brute force XOR key as they are changing more frequently
     while ord(XOR_VALUE) < 255:
 
-        mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE)
+        mu = phase1_unpack(ADD_VALUE, XOR_VALUE, SIZE_VALUE, ENC_PAYLOAD)
 
         if "This program cannot be run in DOS mode" in mu.mem_read(0x10000F9, 150):
             print "\t\t[*] Found XOR key '%s'" % hex(ord(XOR_VALUE))
@@ -535,15 +432,15 @@ def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE):
     if "This program cannot be run in DOS mode" not in mu.mem_read(0x10000F9, 150) and URLS == []:
 
         # Try variant 2
-        SUCCESS_FLAG = phase1_unpack_variant2()
+        SUCCESS_FLAG = phase1_unpack_variant2(ENC_PAYLOAD)
 
         # Try variant 3
         if SUCCESS_FLAG == 0:
-            SUCCESS_FLAG = phase1_unpack_variant3()
+            SUCCESS_FLAG = phase1_unpack_variant3(ENC_PAYLOAD)
 
         # Try variant 4
         if SUCCESS_FLAG == 0:
-            SUCCESS_FLAG = phase1_unpack_variant4()
+            SUCCESS_FLAG = phase1_unpack_variant4(ENC_PAYLOAD)
 
         if SUCCESS_FLAG == 0:
             print "\t[!] Failed to decode phase 1! Shutting down"
@@ -582,27 +479,6 @@ def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE):
                 print "\t[-] %s" % i.replace("http", "hxxp")
             sys.exit(1)
 
-# Check to see if we detected the B64 embedded payload (not shellcode), otherwise proceed with decoding regularly
-try:
-    FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
-    FILE_HANDLE = open(FILE_NAME, "w")
-    FILE_HANDLE.write(B64_PE)
-    FILE_HANDLE.close()
-    print "\t[!] Success! Written to disk as %s" % FILE_NAME
-except:
-    phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE)
-
-################
-# Second Phase #
-################
-
-# Open file just written and copy data
-FILE_HANDLE = open(FILE_NAME, "r")
-FILE_CONTENT = ""
-for i in FILE_HANDLE:
-    FILE_CONTENT += i
-FILE_HANDLE.close()
-
 def phase2_xorhunt(FILE_NAME):
     # Previously seen XOR keys
     # "HEWRTWEWET"
@@ -617,7 +493,7 @@ def phase2_xorhunt(FILE_NAME):
         sys.exit(1)
     return XOR_VALUE
 
-def phase2_unpack(XOR_VALUE):
+def phase2_unpack(XOR_VALUE, FILE_CONTENT):
 
     ADDRESS = 0x1000000
     mu = Uc(UC_ARCH_X86, UC_MODE_32)
@@ -675,116 +551,6 @@ def phase2_unpack(XOR_VALUE):
 
     return mu.mem_read(0x1000040, 0x5000)
 
-print "\t#### PHASE 2 ####"
-
-# 7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f
-# Started to RC4 encrypt C2 URLs
-if re.search("api.ipify.org", FILE_CONTENT) and re.search("CryptDecrypt", FILE_CONTENT) and re.search("CryptDeriveKey", FILE_CONTENT):
-
-    print "\t[!] Detected RC4 encrypted version C2"
-
-    pe = pefile.PE(FILE_NAME)
-    for i in pe.sections:
-        if ".data" in i.Name:
-
-            DATA_SECTION = i.get_data()
-
-            # Decrypt key is first 5 bytes of a SHA1 hash of the first 8 bytes preceeding RC4 encrypted data
-            RC4_KEY = hashlib.sha1(DATA_SECTION[16:24]).digest()[:5]
-            print "\t\t[*] RC4 decrypt key (hex) '0x%s'" % RC4_KEY.encode('hex')
-            ENCRYPT_DATA = DATA_SECTION[24:]
-
-            # RC4 decrypt routine
-            KEY_ARRAY = range(256)
-            INDEX_MOD = 0
-            DECRYPT_DATA = []
-
-            # KSA
-            for INDEX_VAL in range(256):
-
-                INDEX_MOD = (INDEX_MOD + KEY_ARRAY[INDEX_VAL] + ord(RC4_KEY[INDEX_VAL % len(RC4_KEY)])) % 256
-                KEY_ARRAY[INDEX_VAL], KEY_ARRAY[INDEX_MOD] = KEY_ARRAY[INDEX_MOD], KEY_ARRAY[INDEX_VAL]
-
-            # PRGA
-            INDEX_VAL = 0
-            INDEX_MOD = 0
-
-            for value in ENCRYPT_DATA:
-
-                INDEX_VAL = (INDEX_VAL + 1) % 256
-                INDEX_MOD = (INDEX_MOD + KEY_ARRAY[INDEX_VAL]) % 256
-                KEY_ARRAY[INDEX_VAL], KEY_ARRAY[INDEX_MOD] = KEY_ARRAY[INDEX_MOD], KEY_ARRAY[INDEX_VAL]
-                DECRYPT_BYTE = ord(value) ^ KEY_ARRAY[(KEY_ARRAY[INDEX_VAL] + KEY_ARRAY[INDEX_MOD]) % 256]
-
-                DECRYPT_DATA.append(chr(DECRYPT_BYTE))
-
-            DECRYPT_DATA = ''.join(DECRYPT_DATA)
-
-            if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
-                if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
-                    BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
-                    print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
-                URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
-                print "\t[!] Detected Hancitor URLs"
-                for i in URLS:
-                    print "\t[-] %s" % i.replace("http", "hxxp")            
-                sys.exit(1)
-            else:
-                print "\t[!] Failed to decrypt phase 2! Shutting down"
-                sys.exit(1)
-else:
-    # Find XOR keys
-    XOR_VALUE = phase2_xorhunt(FILE_NAME)
-
-# Decode payload
-DEC_PAYLOAD = ""
-for key in XOR_VALUE:
-    key = key[2:] # Strip two leading nulls from regex
-    DEC_PAYLOAD = phase2_unpack(key)
-    if "This program cannot be run in DOS mode" in DEC_PAYLOAD or "NullsoftInst" in DEC_PAYLOAD:
-        XOR_VALUE = key
-        print "\t[-] XOR: %s" % XOR_VALUE
-        break
-
-# Print results
-if "This program cannot be run in DOS mode" not in DEC_PAYLOAD:
-    if re.search("NullsoftInst", DEC_PAYLOAD):
-        print "\t[!] Detected Nullsoft Installer! Shutting down"
-    else:
-        print "\t[!] Failed to decode phase 2! Shutting down"
-    sys.exit(1)
-else:
-    # Write file to disk
-    FILE_NAME = sys.argv[1].split(".")[0] + "_S2.exe"
-    FILE_HANDLE = open(FILE_NAME, "w")
-    FILE_HANDLE.write(DEC_PAYLOAD)
-    FILE_HANDLE.close()
-    print "\t[!] Success! Written to disk as %s" % FILE_NAME
-
-###############
-# Third Phase #
-###############
-
-# Open file just written and copy data
-FILE_HANDLE = open(FILE_NAME, "r")
-FILE_CONTENT = ""
-for i in FILE_HANDLE:
-    FILE_CONTENT += i
-FILE_HANDLE.close()
-
-# Find URLs in Hancitor
-FIND_URL = re.findall("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", FILE_CONTENT)
-
-# Print results
-print "\t### PHASE 3 ###"
-if FIND_URL == []:
-    print "\t[!] No Hancitor URLs found"
-else:
-    print "\t[-] Hancitor URLs"
-    for i in FIND_URL:
-        print "\t[-] %s" % i.replace("http", "hxxp")
-    sys.exit(1)
-
 def h1n1_packed(FILE_CONTENT):
     NULL_OFFSET = list([x.start() for x in re.finditer("\x00\x00..", FILE_CONTENT)])
     for i in NULL_OFFSET:
@@ -810,32 +576,6 @@ def h1n1_packed(FILE_CONTENT):
         else:
             XOR_VALUE = 0
     return DEC_PAYLOAD
-
-DEC_PAYLOAD = h1n1_packed(FILE_CONTENT)
-
-# Print results
-if "Upack" not in DEC_PAYLOAD:
-    print "\t[!] Failed to decode phase 3! Shutting down"
-    sys.exit(1)
-else:
-    print "\t[-] Detected H1N1 DLL packed with Upack"
-    # Write file to disk
-    FILE_NAME = sys.argv[1].split(".")[0] + "_S3.dll"
-    FILE_HANDLE = open(FILE_NAME, "w")
-    FILE_HANDLE.write(DEC_PAYLOAD)
-    FILE_HANDLE.close()
-    print "\t[!] Success! Written to disk as %s" % FILE_NAME
-
-################
-# Fourth Phase #
-################
-
-# Open file just written and copy data
-FILE_HANDLE = open(FILE_NAME, "r")
-FILE_CONTENT = ""
-for i in FILE_HANDLE:
-    FILE_CONTENT += i
-FILE_HANDLE.close()
 
 def h1n1_dll_unpack(FILE_NAME):
     ##############################################################
@@ -917,22 +657,309 @@ def h1n1_scrape(FILE_NAME):
 
     return URLS
 
-print "\t##### PHASE 4 #####"
-print "\t[-] Unpacking Upack H1N1 DLL"
-pe = h1n1_dll_unpack(FILE_NAME)
-FILE_NAME = FILE_NAME.split("_")[0] + "_S3_unpack.dll"
-pe.write(FILE_NAME)
-print "\t[!] Success! Written to disk as %s" % FILE_NAME
+def main():
 
-URLS = h1n1_scrape(FILE_NAME)
+    ###############
+    # First Phase #
+    ###############
 
-# Print results
-print "\t[-] H1N1 URLs"
-for i in URLS[0].split("|"):
+    print "[+] FILE: %s\n\t#### PHASE 1 ####" % sys.argv[1]
+
+    # Open document and copy data
+    FILE_HANDLE = open(sys.argv[1], "r")
+    FILE_CONTENT = ""
+    for i in FILE_HANDLE:
+        FILE_CONTENT += i
+    FILE_HANDLE.close()
+
+    # Pull out base64 encoded shellcode
+    # Adjusted to try and account for catastrophic backtracking
+    SC_DATA = re.search("\00[A-Za-z0-9+/]{3000,}[=]{1,2}\00", FILE_CONTENT)
+    if SC_DATA != None:
+        SC_DATA = SC_DATA.group()
+        SC_DATA = base64.b64decode(SC_DATA)
+
+    # Extract data depending on version of dropper variables
+    if SC_DATA != None:
+        print "\t[-] Found B64 shellcode"
+        # Pull from shellcode
+        INIT_VALUES = re.search("\x8A\x04\x0F\x04.\x34.\x88\x04\x0F\x41\x81\xF9....", SC_DATA).group(0)
+        ADD_VALUE = INIT_VALUES[4]
+        XOR_VALUE = INIT_VALUES[6]
+        SIZE_VALUE = INIT_VALUES[13:]
+        # Extract payload base on shellcode data
+        MAGIC_OFFSET = re.search("\x50\x4F\x4C\x41", FILE_CONTENT)
+        MAGIC_OFFSET = MAGIC_OFFSET.start()
+        SIZE_VALUE = struct.unpack("<L", SIZE_VALUE)[0]
+        ENC_PAYLOAD = FILE_CONTENT[MAGIC_OFFSET:MAGIC_OFFSET + SIZE_VALUE]
+    else:
+        print "\t[!] No raw B64 shellcode, going blind"
+        # Extract payload from magic header bytes
+        if re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}", FILE_CONTENT):
+            print "\t\t[*] Found magic header v1 '%s'" % (re.search(
+                "\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
+            ENC_PAYLOAD = (re.search("\x49\x45\x4E\x44\xAE\x42\x60\x82[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}",
+                                     FILE_CONTENT).group(0))[8:]
+            SIZE_VALUE = len(ENC_PAYLOAD) - 128
+        # New magic header
+        # e1cb2bc858327f9967a3631056f7e513af17990d87780e4ee1c01bc141d3dc7f
+        elif re.search("\x08\x01\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}",
+                       FILE_CONTENT):
+            print "\t\t[*] Found magic header v2 \"%s\"" % (re.search(
+                "\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
+            ENC_PAYLOAD = (re.search("\x01\x01\x06.\x00\x7F\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}",
+                                     FILE_CONTENT).group(0))[8:]
+            SIZE_VALUE = len(ENC_PAYLOAD) - 128
+        # New magic header
+        # 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
+        elif re.search("\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}",
+                       FILE_CONTENT):
+            print "\t\t[*] Found magic header v3 \"%s\"" % (re.search(
+                "\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00", FILE_CONTENT).group(0))[8:-2]
+            ENC_PAYLOAD = (re.search(
+                "\x10\x04\x01\x00\x40.\x04\x07\xFF\xD9[\x00-\xFF]{4,8}\x08\x00[\x00-\xFF]+\x00{128}",
+                FILE_CONTENT).group(0))[8:]
+            SIZE_VALUE = len(ENC_PAYLOAD) - 128
+        else:
+            XOR_VALUE = 0
+            print "\t[!] Magic header not found!"
+            try:
+                ENC_PAYLOAD = list([x.start() for x in re.finditer("\xFF{400}", FILE_CONTENT)])[-1]
+                while XOR_VALUE < 16:
+                    DEC_PAYLOAD = ""
+                    # We don't know end of binary so we scrape all and regex B64 out
+                    for i in FILE_CONTENT[ENC_PAYLOAD:]:
+                        if (ord(i) + 3) ^ 12 < 255:
+                            DEC_PAYLOAD += chr((ord(i) + 3) ^ XOR_VALUE)
+                    B64_PE = re.search("[A-Za-z0-9+/]{3000,}[=]{1,2}", DEC_PAYLOAD)
+                    if B64_PE != None:
+                        try:
+                            B64_PE = B64_PE.group()
+                            B64_PE = base64.b64decode(B64_PE)
+                            if "This program cannot be run in DOS mode" in B64_PE:
+                                print "\t[-] Attempting to find encoded binary"
+                                print "\t\t[*] Found XOR key '%s' " % hex(XOR_VALUE)
+                                break
+                        except:
+                            continue
+                    XOR_VALUE += 1
+                if XOR_VALUE == 16:
+                    sys.exit(1)
+            except:
+                # Quick check for RTF and URLs
+                # 6dcbf652b96a7aea16d0c2e72186173d9345f722c9592e62820bcfe477b2b297
+                if re.search("objdata", FILE_CONTENT, re.IGNORECASE) and re.search("objclass", FILE_CONTENT,
+                                                                                   re.IGNORECASE) and re.search(
+                    "objupdate", FILE_CONTENT, re.IGNORECASE):
+
+                    print "\t[!] Found RTF Variant"
+
+                    URLS = []
+                    B64_PE = None
+
+                    for HEX_STRING in re.findall("[a-fA-F0-9]{2000,}", FILE_CONTENT):
+
+                        HEX_STRING = HEX_STRING.decode("hex")
+
+                        # Check for URLs first - variant 1
+                        for url in re.findall("\'http.+?\'", HEX_STRING):
+                            if url[1:-1] not in URLS:
+                                URLS.append(url[1:-1])
+
+                        # Check for B64 encoded PE - variant 2
+                        if "TVqQAAM" in HEX_STRING:
+                            B64_PE = base64.b64decode(re.search("TVqQA[A-Za-z0-9+/=]{1000,}", HEX_STRING).group())
+
+                    if URLS != []:
+                        print "\t[!] Extracted URLs"
+                        for url in URLS:
+                            print "\t[-] %s" % url.replace("http", "hxxp")
+                        sys.exit(1)
+
+                # Failure to detect ANY method for decoding
+                if B64_PE == None:
+                    print "\t[!] Unable to process %s" % sys.argv[1]
+                    sys.exit(1)
+
+        # Phase1 most common variables
+        ADD_VALUE = "\x03"
+        XOR_VALUE = "\x00"  # Seen \x13 and \x10
+
+    # Check to see if we detected the B64 embedded payload (not shellcode), otherwise proceed with decoding regularly
     try:
-        URL = i.split(":")[0]
-        URI = i.split(":")[1].strip("80")
-        print "\t[-] hxxp://%s%s" % (URL, URI)
+        FILE_NAME = sys.argv[1].split(".")[0] + "_S1.exe"
+        FILE_HANDLE = open(FILE_NAME, "w")
+        FILE_HANDLE.write(B64_PE)
+        FILE_HANDLE.close()
+        print "\t[!] Success! Written to disk as %s" % FILE_NAME
     except:
-        pass
+        phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE, ENC_PAYLOAD)
 
+    ################
+    # Second Phase #
+    ################
+
+    # Open file just written and copy data
+    FILE_HANDLE = open(FILE_NAME, "r")
+    FILE_CONTENT = ""
+    for i in FILE_HANDLE:
+        FILE_CONTENT += i
+    FILE_HANDLE.close()
+
+    print "\t#### PHASE 2 ####"
+
+    # 7eaa732d95252bf05440aca56f1b2e789dab39af72031a11fc597be88b1ede7f
+    # Started to RC4 encrypt C2 URLs
+    if re.search("api.ipify.org", FILE_CONTENT) and re.search("CryptDecrypt", FILE_CONTENT) and re.search("CryptDeriveKey", FILE_CONTENT):
+
+        print "\t[!] Detected RC4 encrypted version C2"
+
+        pe = pefile.PE(FILE_NAME)
+        for i in pe.sections:
+            if ".data" in i.Name:
+
+                DATA_SECTION = i.get_data()
+
+                # Decrypt key is first 5 bytes of a SHA1 hash of the first 8 bytes preceeding RC4 encrypted data
+                RC4_KEY = hashlib.sha1(DATA_SECTION[16:24]).digest()[:5]
+                print "\t\t[*] RC4 decrypt key (hex) '0x%s'" % RC4_KEY.encode('hex')
+                ENCRYPT_DATA = DATA_SECTION[24:]
+
+                # RC4 decrypt routine
+                KEY_ARRAY = range(256)
+                INDEX_MOD = 0
+                DECRYPT_DATA = []
+
+                # KSA
+                for INDEX_VAL in range(256):
+
+                    INDEX_MOD = (INDEX_MOD + KEY_ARRAY[INDEX_VAL] + ord(RC4_KEY[INDEX_VAL % len(RC4_KEY)])) % 256
+                    KEY_ARRAY[INDEX_VAL], KEY_ARRAY[INDEX_MOD] = KEY_ARRAY[INDEX_MOD], KEY_ARRAY[INDEX_VAL]
+
+                # PRGA
+                INDEX_VAL = 0
+                INDEX_MOD = 0
+
+                for value in ENCRYPT_DATA:
+
+                    INDEX_VAL = (INDEX_VAL + 1) % 256
+                    INDEX_MOD = (INDEX_MOD + KEY_ARRAY[INDEX_VAL]) % 256
+                    KEY_ARRAY[INDEX_VAL], KEY_ARRAY[INDEX_MOD] = KEY_ARRAY[INDEX_MOD], KEY_ARRAY[INDEX_VAL]
+                    DECRYPT_BYTE = ord(value) ^ KEY_ARRAY[(KEY_ARRAY[INDEX_VAL] + KEY_ARRAY[INDEX_MOD]) % 256]
+
+                    DECRYPT_DATA.append(chr(DECRYPT_BYTE))
+
+                DECRYPT_DATA = ''.join(DECRYPT_DATA)
+
+                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
+                    if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
+                        BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                        print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
+                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
+                    print "\t[!] Detected Hancitor URLs"
+                    for i in URLS:
+                        print "\t[-] %s" % i.replace("http", "hxxp")
+                    sys.exit(1)
+                else:
+                    print "\t[!] Failed to decrypt phase 2! Shutting down"
+                    sys.exit(1)
+    else:
+        # Find XOR keys
+        XOR_VALUE = phase2_xorhunt(FILE_NAME)
+
+    # Decode payload
+    DEC_PAYLOAD = ""
+    for key in XOR_VALUE:
+        key = key[2:] # Strip two leading nulls from regex
+        DEC_PAYLOAD = phase2_unpack(key, FILE_CONTENT)
+        if "This program cannot be run in DOS mode" in DEC_PAYLOAD or "NullsoftInst" in DEC_PAYLOAD:
+            XOR_VALUE = key
+            print "\t[-] XOR: %s" % XOR_VALUE
+            break
+
+    # Print results
+    if "This program cannot be run in DOS mode" not in DEC_PAYLOAD:
+        if re.search("NullsoftInst", DEC_PAYLOAD):
+            print "\t[!] Detected Nullsoft Installer! Shutting down"
+        else:
+            print "\t[!] Failed to decode phase 2! Shutting down"
+        sys.exit(1)
+    else:
+        # Write file to disk
+        FILE_NAME = sys.argv[1].split(".")[0] + "_S2.exe"
+        FILE_HANDLE = open(FILE_NAME, "w")
+        FILE_HANDLE.write(DEC_PAYLOAD)
+        FILE_HANDLE.close()
+        print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+    ###############
+    # Third Phase #
+    ###############
+
+    # Open file just written and copy data
+    FILE_HANDLE = open(FILE_NAME, "r")
+    FILE_CONTENT = ""
+    for i in FILE_HANDLE:
+        FILE_CONTENT += i
+    FILE_HANDLE.close()
+
+    # Find URLs in Hancitor
+    FIND_URL = re.findall("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", FILE_CONTENT)
+
+    # Print results
+    print "\t### PHASE 3 ###"
+    if FIND_URL == []:
+        print "\t[!] No Hancitor URLs found"
+    else:
+        print "\t[-] Hancitor URLs"
+        for i in FIND_URL:
+            print "\t[-] %s" % i.replace("http", "hxxp")
+        sys.exit(1)
+
+    DEC_PAYLOAD = h1n1_packed(FILE_CONTENT)
+
+    # Print results
+    if "Upack" not in DEC_PAYLOAD:
+        print "\t[!] Failed to decode phase 3! Shutting down"
+        sys.exit(1)
+    else:
+        print "\t[-] Detected H1N1 DLL packed with Upack"
+        # Write file to disk
+        FILE_NAME = sys.argv[1].split(".")[0] + "_S3.dll"
+        FILE_HANDLE = open(FILE_NAME, "w")
+        FILE_HANDLE.write(DEC_PAYLOAD)
+        FILE_HANDLE.close()
+        print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+    ################
+    # Fourth Phase #
+    ################
+
+    # Open file just written and copy data
+    FILE_HANDLE = open(FILE_NAME, "r")
+    FILE_CONTENT = ""
+    for i in FILE_HANDLE:
+        FILE_CONTENT += i
+    FILE_HANDLE.close()
+
+    print "\t##### PHASE 4 #####"
+    print "\t[-] Unpacking Upack H1N1 DLL"
+    pe = h1n1_dll_unpack(FILE_NAME)
+    FILE_NAME = FILE_NAME.split("_")[0] + "_S3_unpack.dll"
+    pe.write(FILE_NAME)
+    print "\t[!] Success! Written to disk as %s" % FILE_NAME
+
+    URLS = h1n1_scrape(FILE_NAME)
+
+    # Print results
+    print "\t[-] H1N1 URLs"
+    for i in URLS[0].split("|"):
+        try:
+            URL = i.split(":")[0]
+            URI = i.split(":")[1].strip("80")
+            print "\t[-] hxxp://%s%s" % (URL, URI)
+        except:
+            pass
+
+if __name__ == '__main__':
+    main()
