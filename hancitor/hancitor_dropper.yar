@@ -1,8 +1,10 @@
 rule h_dropper : vb_win32api
 {
     meta:
-        author = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date   = "16JAN2018"
+        author  = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
+        date    = "29JAN2018"
+        comment = "All hashes in block comment for each change"
+        /*
         hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
         hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
         hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
@@ -82,6 +84,9 @@ rule h_dropper : vb_win32api
         hash76 = "373da1b6a95ba6e9d6efe7b57d5877d914ffa394ed6e74576f4283a9388d3c79"
         hash77 = "9906d7cbd7675f3334ef91e3a63792180e149b07a5899b1e2f9be5dcc6e8a086"
         hash78 = "85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909"
+        hash80 = "9c1ad87660e13b35fc48961f0936e9724aa763a3130e194bf67402a118d32657"
+        hash81 = "67551c7547012bc5a094f7793d8f0bffd0df64bda06132a965d0a4e8b88545b2"
+        */
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
     strings:
@@ -177,6 +182,7 @@ rule h_dropper : vb_win32api
         $magic_brak_bitls               = { 5B 42 49 54 4C 53 }                                                                     // [BITLS
         $magic_bang_holid               = { 21 48 4F 4C 49 44 }                                                                     // !HOLID
         $magic_bang_kfrty               = { 21 4B 46 52 54 59 }                                                                     // !KFRTY
+        $magic_upar_youho               = { 5E 59 4F 55 48 4F }                                                                     // ^YOUHO
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
