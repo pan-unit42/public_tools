@@ -2,18 +2,18 @@ rule h_dropper : vb_win32api
 {
     meta:
         author  = "Jeff White - jwhite@paloaltonetworks.com @noottrak"
-        date    = "22FEB018"
+        date    = "09MAR2018"
         comment = "All hashes in block comment for each change"
         /*
-        hash1  = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
-        hash2  = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
-        hash3  = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
-        hash4  = "b586c11f5485e3a38a156cba10379a4135a8fe34aa2798af8d543c059f0ac9a4"
-        hash5  = "23fe2647f544fad876121e1fabe5a702282ae59ac9a1a92dccf93e804bb78f77"
-        hash6  = "16aec80227bdce01ed6cafffd723f59f46bbb4e7ab8a7de707501d8ad08ac6aa"
-        hash7  = "3274e2b7228ebd57205da16bb9798fa75439869dad2da4506dbad6150a4f06a2"
-        hash8  = "14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd"
-        hash9  = "b506faff00ae557056d387442e9d4d2a53e87c5f9cd59f75db9ba5525ffa0ba3"
+        hash01 = "03aef51be133425a0e5978ab2529890854ecf1b98a7cf8289c142a62de7acd1a"
+        hash02 = "4b3912077ef47515b2b74bc1f39de44ddd683a3a79f45c93777e49245f0e9848"
+        hash03 = "a78972ac6dee8c7292ae06783cfa1f918bacfe956595d30a0a8d99858ce94b5a"
+        hash04 = "b586c11f5485e3a38a156cba10379a4135a8fe34aa2798af8d543c059f0ac9a4"
+        hash05 = "23fe2647f544fad876121e1fabe5a702282ae59ac9a1a92dccf93e804bb78f77"
+        hash06 = "16aec80227bdce01ed6cafffd723f59f46bbb4e7ab8a7de707501d8ad08ac6aa"
+        hash07 = "3274e2b7228ebd57205da16bb9798fa75439869dad2da4506dbad6150a4f06a2"
+        hash08 = "14211739584aa0f04ba8845a9b66434529e5e4636f460d34fa84821ebfb142fd"
+        hash09 = "b506faff00ae557056d387442e9d4d2a53e87c5f9cd59f75db9ba5525ffa0ba3"
         hash10 = "da7b5a206d29bd7ee6abac0431dcfa71e6abab22d63430bc495b62a6105d24e9"
         hash11 = "45289367ea1ddc0f33e77e2499fde0a3577a5137037f9208ed1cdded92ee2dc2"
         hash12 = "fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac"
@@ -87,6 +87,8 @@ rule h_dropper : vb_win32api
         hash80 = "9c1ad87660e13b35fc48961f0936e9724aa763a3130e194bf67402a118d32657"
         hash81 = "67551c7547012bc5a094f7793d8f0bffd0df64bda06132a965d0a4e8b88545b2"
         hash82 = "562836cf74eec97971c8311250aa1fbb90f632b06f383a87b5ffd0d0eb49b623"
+        hash83 = "1d63cfe0c0b6c80212aafef737fc63f63415634c74ac3159966f63c31c1a08d4"
+        hash84 = "db020a0d727a43fa018aa530630a9b186222f85c9af50d4b5720fc180551c277"
         */
         description = "Detects Microsoft Word documents using a technique commonly found to deploy Hancitor or H1N1 downloaders"
         
@@ -185,6 +187,8 @@ rule h_dropper : vb_win32api
         $magic_bang_kfrty               = { 21 4B 46 52 54 59 }                                                                     // !KFRTY
         $magic_upar_youho               = { 5E 59 4F 55 48 4F }                                                                     // ^YOUHO
         $magic_bang_plkoi               = { 21 50 4C 4B 4F 49 }                                                                     // !PLKOI
+        $magic_bang_ssdds               = { 21 53 53 44 44 53 }                                                                     // !SSDDS
+        $magic_bang_lusia               = { 21 4C 55 53 49 41 }                                                                     // !LUSIA
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
