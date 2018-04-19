@@ -5,24 +5,28 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.9"
-__date__    = "24JAN2018"
+__version__ = "1.2.0"
+__date__    = "19APR2018"
+
+# v1.2.0 - 006f7fd56fa89fa576fa95221bdf16422d66787ca366e57816ff6d8a957d7de5
+# Adjusted the RC4 decryption function to account for blob size.
+# Included second regex for version number in decrypted content
 
 # v1.1.9 - 6dcbf652b96a7aea16d0c2e72186173d9345f722c9592e62820bcfe477b2b297
 # Added functionality to strip URL from new RTF variant of Hancitor
 
 # v1.1.8 - 85d2ba3f12877bf7e531ec1970909f2ea20f55ba17d27f4a5b65e8e8dc493909
-# Added new variant stub and ability to adjust offset for B64 decoding.
+# Added new variant stub and ability to adjust offset for B64 decoding
 
 # v1.1.7 - efe7cfe0c08265e1a4eed68a1e544ba0e98fff98942e0e55941e1899aba71579
-# Latest versions Base64 buffer is longer than what is decoded so caused padding issue. Adjusted to account.
+# Latest versions Base64 buffer is longer than what is decoded so caused padding issue. Adjusted to account
 
 # v1.1.6
 # Newer versions of Unicorn Engine (1.0.0+) changed memory management so I needed to adjust some areas to re-init the memory sections each loop
 
 # v1.1.5 - 62e6e5dc0c3927a8c5d708688ca2b56df93848b15a4c38aab173c5a8384395f9
 # Added variant 4 to phase 1 decoder - now doing alternating 4-byte XOR keys
-# They fixed variant 3 so it now alternates correctly. Key-pairs will need to be added manually.
+# They fixed variant 3 so it now alternates correctly. Key-pairs will need to be added manually
 
 # v1.1.4 - 800bf028a23440134fc834efc5c1e02cc70f05b2e800bbc285d7c92a4b126b1c
 # Added variant 3 to phase 1 decoder - now doing 4-byte XOR key
@@ -820,10 +824,10 @@ def main():
 
                 DATA_SECTION = i.get_data()
 
-                # Decrypt key is first 5 bytes of a SHA1 hash of the first 8 bytes preceeding RC4 encrypted data
+                # Decrypt key is first 5 bytes of a SHA1 hash of the first 8 bytes preceding RC4 encrypted data
                 RC4_KEY = hashlib.sha1(DATA_SECTION[16:24]).digest()[:5]
                 print "\t\t[*] RC4 decrypt key (hex) '0x%s'" % RC4_KEY.encode('hex')
-                ENCRYPT_DATA = DATA_SECTION[24:]
+                ENCRYPT_DATA = DATA_SECTION[24:2000]
 
                 # RC4 decrypt routine
                 KEY_ARRAY = range(256)
@@ -851,11 +855,14 @@ def main():
 
                 DECRYPT_DATA = ''.join(DECRYPT_DATA)
 
-                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
+                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{1,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
                     if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
                         BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                         print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
-                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
+                    if re.search("^[0-9]+[a-z]+[0-9]+", DECRYPT_DATA):
+                        BUILD_NUMBER = re.search("^[0-9]+[a-z]+[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                        print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
+                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{1,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                     print "\t[!] Detected Hancitor URLs"
                     for i in URLS:
                         print "\t[-] %s" % i.replace("http", "hxxp")
