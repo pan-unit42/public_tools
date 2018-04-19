@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.1.9"
+__version__ = "1.1.10"
 __date__    = "24JAN2018"
+
+# 1.1.10 - 006f7fd56fa89fa576fa95221bdf16422d66787ca366e57816ff6d8a957d7de5
+# Adjust regex for cncs as /4/forum.php
 
 # v1.1.9 - 6dcbf652b96a7aea16d0c2e72186173d9345f722c9592e62820bcfe477b2b297
 # Added functionality to strip URL from new RTF variant of Hancitor
@@ -851,11 +854,11 @@ def main():
 
                 DECRYPT_DATA = ''.join(DECRYPT_DATA)
 
-                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
+                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{1,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
                     if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
                         BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                         print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
-                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
+                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{1,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                     print "\t[!] Detected Hancitor URLs"
                     for i in URLS:
                         print "\t[-] %s" % i.replace("http", "hxxp")
