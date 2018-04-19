@@ -471,7 +471,7 @@ def phase1(ADD_VALUE, SIZE_VALUE, XOR_VALUE, ENC_PAYLOAD):
             # fc1f1845e47d4494a02407c524eb0e94b6484045adb783e90406367ae20a83ac - forum.php
             # Direct embed
             if re.search("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", mu.mem_read(0x10000F9, SIZE_VALUE)):
-                URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", mu.mem_read(0x10000F9, SIZE_VALUE))
+                URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{1,10}\/[a-zA-Z0-9]+\.php", mu.mem_read(0x10000F9, SIZE_VALUE))
                 print "\t[!] Detected Hancitor URLs"
                 for i in URLS:
                     print "\t[-] %s" % i.replace("http", "hxxp")
@@ -854,11 +854,11 @@ def main():
 
                 DECRYPT_DATA = ''.join(DECRYPT_DATA)
 
-                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{1,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
+                if re.findall("http://[a-z0-9]{5,50}\.[a-z]{1,10}/[a-zA-Z0-9]{1,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA):
                     if re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA):
                         BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                         print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
-                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{1,10}/[a-zA-Z0-9]{2,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
+                    URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{1,10}/[a-zA-Z0-9]{1,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                     print "\t[!] Detected Hancitor URLs"
                     for i in URLS:
                         print "\t[-] %s" % i.replace("http", "hxxp")
