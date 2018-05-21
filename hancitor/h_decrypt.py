@@ -5,8 +5,11 @@ import re, struct, sys, base64, pefile, binascii, hashlib
 
 __author__  = "Jeff White [karttoon] @noottrak"
 __email__   = "jwhite@paloaltonetworks.com"
-__version__ = "1.2.0"
-__date__    = "19APR2018"
+__version__ = "1.2.1"
+__date__    = "21MAY2018"
+
+# v1.2.1 - e864f9735349e14c8c4583fe4c29b1b8eab5fca74855476f91e93349b796d818
+# Adjusted regex for Build Number on Variant 4
 
 # v1.2.0 - 006f7fd56fa89fa576fa95221bdf16422d66787ca366e57816ff6d8a957d7de5
 # Adjusted the RC4 decryption function to account for blob size.
@@ -860,7 +863,7 @@ def main():
                         BUILD_NUMBER = re.search("^[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                         print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
                     if re.search("^[0-9]+[a-z]+[0-9]+", DECRYPT_DATA):
-                        BUILD_NUMBER = re.search("^[0-9]+[a-z]+[0-9]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
+                        BUILD_NUMBER = re.search("^[0-9]+[a-z]+[0-9a-z]+\x00\x00\x00\x00", DECRYPT_DATA).group(0)[:-4]
                         print "\t[-] Hancitor Build Number '%s'" % BUILD_NUMBER
                     URLS = re.findall("http://[a-z0-9]{5,50}\.[a-z]{2,10}/[a-zA-Z0-9]{1,10}\/[a-zA-Z0-9]+\.php", DECRYPT_DATA)
                     print "\t[!] Detected Hancitor URLs"
