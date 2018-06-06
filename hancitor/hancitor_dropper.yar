@@ -204,7 +204,7 @@ rule h_dropper : vb_win32api
         $magic_elip_folka               = { 29 66 6F 6C 6B 61 }                                                                     // )folka
         $magic_elip_tools               = { 29 74 6F 6F 6C 73 }                                                                     // )tools
         $magic_elip_finge               = { 29 66 69 6E 67 65 }                                                                     // )finge
-        $magic_elip_moris               = { 29 6D 6F 72 69 73 }                                                                     // )moris
+        $magic_elip_moris               = { 29 6D 6F 72 69 73 }                                                                     // (moris
         // Shellcode stub
         $stub_v1                        = { 49 45 4E 44 AE 42 60 82 [4-8] 08 00 }                                                   // Stub v1
         $stub_v2                        = { 01 01 06 3F 00 7F FF D9 [4-8] 08 00 }                                                   // Stub v2
