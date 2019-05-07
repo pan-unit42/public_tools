@@ -2,7 +2,7 @@
 # Description: Attempts to extract macros and decode embedded strings. These
 # macros make use of a UAC bypass technique. Script relies on the accompanying
 # olevba.py script included. 
-# Reference: TBD
+# Reference: https://github.com/pan-unit42/public_tools/blob/master/macro_loader/macro_decode.py
 
 import sys, re
 from olevba import VBA_Parser, filter_vba
