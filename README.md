@@ -1,4 +1,4 @@
-![Screenshot](UNIT 42 THREAT INTELLIGENCE.PNG)
+![Optional Text](UNIT 42 THREAT INTELLIGENCE.PNG.png)
 
 # Unit 42 Public Tools Repo
 
