@@ -1,4 +1,4 @@
-![](https://s3.amazonaws.com/u42/unit42.png)
+![Screenshot](UNIT 42 THREAT INTELLIGENCE.PNG)
 
 # Unit 42 Public Tools Repo
 
