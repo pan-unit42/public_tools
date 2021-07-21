@@ -1,0 +1,31 @@
+Welcome to the UNIT 42 PlugX Decrypter 
+
+Description
+    This is a simple Python script that can be used to decrypt certain PlugX encrypted payload files. If successful, the script produces two files:
+    1 - Decrypted command & control information with the naming schema of: inputfilename._c2Decrypt.dat. This file can be viewed in a text editor
+    2 - Decompressed module (DLL) that can be used in IDA Pro or Ghidra for static analysis. Output filename: inputfilename._decompressed.dl_. The script adds an X86 MZ header to the output file, which might not be 100% to PE specs for the given input file and would require updating. 
+    
+Requirements:
+    Python 3.X (will not work with Python 2.x)
+    Python Modules
+        iced-x86, lznt1, and pefile. Run pip install -r requirements.txt
+
+Running Program:
+    python DecryptPlugX.py input_file
+    where the input file is the PlugX encrypted payload file you want to decrypt
+    
+Example:
+    
+    DecryptPlugX.py d:\temp\aro.dat
+
+    DecryptPlugX.py Version 1.3.0 UNIT 42 Dev: Mike Harbison Build date 17 June, 2021
+    [+] Hardcoded configuration (C2) data found
+    [+] Found NULL in header data at file offset 1259
+    [+] Found start decryption key of 0x:2aef31ab
+    [+] Wrote decrypted embedded C2 information to file WindowsPath('d:/temp/aro._c2Decrypt.dat')
+    [+] Located encrypted payload at starting file offset 6761
+    [+] Successfully decrypted input file. Attempting to decompress file to module (DLL)
+    [+] Successfully decompressed module.
+    [+] Adding MZ and PE header
+    [+] Saved decompressed file to WindowsPath('d:/temp/aro._decompressed.dl_')
+    [+] Finished
