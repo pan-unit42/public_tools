@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+from fileinput import filename
 import re, base64, zlib, binascii, argparse
 from Crypto.Cipher import AES
 from datetime import datetime
+
+from yaml import parse
 
 
 __author__ = "Jeff White [karttoon] @noottrak"
@@ -1706,6 +1709,20 @@ def unravelContent(originalData):
     return contentData
 
 
+def strip_comment(originalData):
+    if re.search(r"^\ *#(?!(>)).*",originalData):
+        return ""
+    return originalData
+
+
+def strip_comments(originalData):
+    comment = re.compile(r'\n<#.*?#>', re.DOTALL)
+    for each in comment.findall(originalData):
+        originalData = originalData.replace(each,"")
+    return originalData
+    #return re.sub(r'\n<#.*?#>',"",originalData,re.DOTALL)
+
+
 def main():
 
     parser = argparse.ArgumentParser(description="PowerShellProfiler analyzes PowerShell scripts statically to identify and score behaviors.")
@@ -1726,12 +1743,21 @@ def main():
     # Open file for processing, ignore errors
     scriptTime = datetime.now()
     with open(args.file, encoding='utf8', errors='ignore') as fh:
-        originalData = fh.read()
+        originalData_list = fh.readlines()
     if debugFlag:
         print("Opened File %s" % (args.file))
 
+    # Strip comments 
+    originalData = ""
+    for each_list in originalData_list:
+        originalData += strip_comment(each_list)
+
+    originalData = strip_comments(originalData)
+
     # Strip NULLs out before processing
     originalData = originalData.replace("\x00", "")
+
+    
 
     # Launches the primary unraveling loop to begin cleaning up the script for profiling.
     startTime = datetime.now()
@@ -1762,6 +1788,10 @@ def main():
     # Print what we've parsed out for debugging
     if debugFlag:
         print(alternativeData)
+        filenamelist = args.file.rsplit('\\',1)
+        newfilename = filenamelist[0] + "\\" + filenamelist[1].rsplit('.',1)[0] + "_clean" + '.' + filenamelist[1].rsplit('.',1)[1]
+        with  open(newfilename, "w",encoding='utf8', errors='ignore') as fw:
+            fw.writelines(originalData)
 
     return
 
